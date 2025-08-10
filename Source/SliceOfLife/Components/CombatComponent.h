@@ -174,6 +174,14 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Animation")
     float MontagePlayRate = 1.0f;
 
+public:
+    // Exposed helpers for animation notifies
+    UFUNCTION(BlueprintCallable, Category = "Combat|Hitbox")
+    void SpawnHitboxParams(const FVector& LocalOffset, const FVector& BoxExtent, float Damage, float KnockbackForce);
+
+    UFUNCTION(BlueprintCallable, Category = "Combat|State")
+    void EndAttackNow();
+
 protected:
 	// Combat State
 	UPROPERTY(BlueprintReadOnly, Category = "Combat")

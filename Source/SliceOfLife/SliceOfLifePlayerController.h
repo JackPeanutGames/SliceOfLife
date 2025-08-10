@@ -11,6 +11,13 @@ class SLICEOFLIFE_API ASliceOfLifePlayerController : public APlayerController
 
 public:
     virtual void BeginPlay() override;
+
+    // UI hooks for designers to implement in BP
+    UFUNCTION(BlueprintImplementableEvent, Category = "UI")
+    void CreateAndAddDebugWidgets();
+
+    UFUNCTION(BlueprintCallable, Category = "UI")
+    void UpdatePlayerStateDisplay(float DamagePercent, const FString& StateLabel, FVector2D Velocity);
 };
 
 

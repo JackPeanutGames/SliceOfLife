@@ -151,4 +151,7 @@ protected:
 	void ApplyHitstunEffects();
 	void ClearHitstunEffects();
 	float CalculateKnockbackForce(float BaseForce, float DamagePercent) const;
+
+private:
+    void UpdatePlayerStateDamagePercent();
 };

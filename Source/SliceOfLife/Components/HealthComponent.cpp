@@ -2,6 +2,7 @@
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Engine/World.h"
+#include "SliceOfLife/SliceOfLifePlayerState.h"
 
 UHealthComponent::UHealthComponent()
 {
@@ -47,6 +48,7 @@ void UHealthComponent::TakeDamage(float Damage, FVector KnockbackDirection, floa
 	
 	// Calculate damage percentage (for knockback scaling)
 	CurrentDamagePercent = ((MaxHealth - CurrentHealth) / MaxHealth) * 100.0f;
+    UpdatePlayerStateDamagePercent();
 	
 	// Calculate knockback force
 	float FinalKnockbackForce = CalculateKnockbackForce(KnockbackForce, CurrentDamagePercent);
@@ -84,6 +86,7 @@ void UHealthComponent::Heal(float HealAmount)
 	float OldHealth = CurrentHealth;
 	CurrentHealth = FMath::Min(MaxHealth, CurrentHealth + HealAmount);
 	CurrentDamagePercent = ((MaxHealth - CurrentHealth) / MaxHealth) * 100.0f;
+    UpdatePlayerStateDamagePercent();
 	
 	if (CurrentHealth != OldHealth)
 	{
@@ -99,6 +102,7 @@ void UHealthComponent::SetMaxHealth(float NewMaxHealth)
 		MaxHealth = NewMaxHealth;
 		CurrentHealth = MaxHealth * HealthRatio;
 		CurrentDamagePercent = ((MaxHealth - CurrentHealth) / MaxHealth) * 100.0f;
+        UpdatePlayerStateDamagePercent();
 		
 		OnHealthChanged.Broadcast(CurrentHealth);
 	}
@@ -108,6 +112,7 @@ void UHealthComponent::ResetHealth()
 {
 	CurrentHealth = MaxHealth;
 	CurrentDamagePercent = 0.0f;
+    UpdatePlayerStateDamagePercent();
 	ClearHitstun();
 	
 	OnHealthChanged.Broadcast(CurrentHealth);
@@ -210,4 +215,18 @@ float UHealthComponent::CalculateKnockbackForce(float BaseForce, float DamagePer
 	FinalForce *= (BaseForce / 1000.0f); // Normalize base force
 	
 	return FinalForce;
+}
+
+void UHealthComponent::UpdatePlayerStateDamagePercent()
+{
+    if (ACharacter* OwnerCharacter = Cast<ACharacter>(GetOwner()))
+    {
+        if (APlayerState* PS = OwnerCharacter->GetPlayerState())
+        {
+            if (ASliceOfLifePlayerState* SOLPS = Cast<ASliceOfLifePlayerState>(PS))
+            {
+                SOLPS->SetDamagePercent(CurrentDamagePercent);
+            }
+        }
+    }
 }

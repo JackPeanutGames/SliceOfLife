@@ -281,6 +281,36 @@ void UCombatComponent::DetectHits()
     // Montages + anim notifies should drive precise hit detection; not used by default
 }
 
+void UCombatComponent::SpawnHitboxParams(const FVector& LocalOffset, const FVector& BoxExtent, float Damage, float KnockbackForce)
+{
+    if (AActor* OwnerActor = GetOwner())
+    {
+        const FVector Center = OwnerActor->GetActorLocation() 
+            + OwnerActor->GetActorForwardVector() * LocalOffset.X
+            + OwnerActor->GetActorRightVector() * LocalOffset.Y
+            + OwnerActor->GetActorUpVector() * LocalOffset.Z;
+
+        // Simple box trace forward for a hit
+        const FVector Start = Center;
+        const FVector End = Center + OwnerActor->GetActorForwardVector() * 5.f;
+        FHitResult Hit;
+        FCollisionShape Box = FCollisionShape::MakeBox(BoxExtent);
+        FCollisionQueryParams Params(SCENE_QUERY_STAT(NotifyHitbox), false, OwnerActor);
+        if (OwnerActor->GetWorld()->SweepSingleByChannel(Hit, Start, End, FQuat::Identity, ECC_Pawn, Box, Params))
+        {
+            if (AActor* HitActor = Hit.GetActor())
+            {
+                UGameplayStatics::ApplyPointDamage(HitActor, Damage, OwnerActor->GetActorForwardVector(), Hit, nullptr, OwnerActor, nullptr);
+            }
+        }
+    }
+}
+
+void UCombatComponent::EndAttackNow()
+{
+    EndAttack();
+}
+
 float UCombatComponent::CalculateStaleMultiplier(const FString& MoveName)
 {
 	// Placeholder: could implement decay over time

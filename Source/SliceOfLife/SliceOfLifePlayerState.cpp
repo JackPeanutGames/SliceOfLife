@@ -16,4 +16,15 @@ void ASliceOfLifePlayerState::GetLifetimeReplicatedProps(TArray<FLifetimePropert
     DOREPLIFETIME(ASliceOfLifePlayerState, Collectibles);
 }
 
+void ASliceOfLifePlayerState::SetDamagePercent(float NewPercent)
+{
+    DamagePercent = FMath::Max(0.f, NewPercent);
+    OnDamagePercentChanged.Broadcast(DamagePercent);
+}
+
+void ASliceOfLifePlayerState::AddDamagePercent(float DeltaPercent)
+{
+    SetDamagePercent(DamagePercent + DeltaPercent);
+}
+
 

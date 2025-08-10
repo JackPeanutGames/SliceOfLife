@@ -158,24 +158,21 @@ void AEnemyBase::StunEnemy(float Duration)
 
 void AEnemyBase::MoveToLocation(FVector Location, float AcceptanceRadius)
 {
-	if (UCharacterMovementComponent* MovementComp = GetCharacterMovement())
-	{
-		// Simple movement towards location
-		FVector Direction = (Location - GetActorLocation()).GetSafeNormal();
-		FVector NewVelocity = Direction * GetMovementSpeed();
-		
-		// Only apply horizontal movement
-		NewVelocity.Z = MovementComp->Velocity.Z;
-		MovementComp->Velocity = NewVelocity;
-	}
+    if (AAIController* AI = Cast<AAIController>(GetController()))
+    {
+        FAIMoveRequest Req;
+        Req.SetGoalLocation(Location);
+        Req.SetAcceptanceRadius(AcceptanceRadius);
+        AI->MoveTo(Req);
+    }
 }
 
 void AEnemyBase::StopMovement()
 {
-	if (UCharacterMovementComponent* MovementComp = GetCharacterMovement())
-	{
-		MovementComp->Velocity = FVector::ZeroVector;
-	}
+    if (AAIController* AI = Cast<AAIController>(GetController()))
+    {
+        AI->StopMovement();
+    }
 }
 
 void AEnemyBase::PerformAttack()

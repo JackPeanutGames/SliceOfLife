@@ -98,14 +98,15 @@ void AEnemyBase::Tick(float DeltaTime)
 
 float AEnemyBase::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
 {
-	float DamageTaken = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
-
-	if (DamageTaken > 0.0f)
-	{
-		OnDamageReceived(DamageTaken, FVector::ZeroVector, 0.0f);
-	}
-
-	return DamageTaken;
+    const float Actual = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
+    if (HealthComponent && Actual > 0.f)
+    {
+        FVector KnockDir = (DamageCauser ? (GetActorLocation() - DamageCauser->GetActorLocation()).GetSafeNormal() : GetActorForwardVector());
+        const float KnockForce = 600.f;
+        HealthComponent->TakeDamage(Actual, KnockDir, KnockForce, DamageCauser);
+        OnDamageReceived(Actual, KnockDir, KnockForce);
+    }
+    return Actual;
 }
 
 void AEnemyBase::SetEnemyState(EEnemyState NewState)

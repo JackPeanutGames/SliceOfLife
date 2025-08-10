@@ -60,12 +60,13 @@ class SLICEOFLIFE_API UPlayerMovementComponent : public UCharacterMovementCompon
 public:
 	UPlayerMovementComponent();
 
-	virtual void BeginPlay() override;
-	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
+    virtual void BeginPlay() override;
+    virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
 	// Movement Input Functions
-	UFUNCTION(BlueprintCallable, Category = "Movement")
-	void SetMovementInput(FVector2D Input);
+    // Deprecated: movement input is handled by ACharacter::AddMovementInput
+    UFUNCTION(BlueprintCallable, Category = "Movement")
+    void SetMovementInput(FVector2D Input);
 
 	UFUNCTION(BlueprintCallable, Category = "Movement")
 	void JumpPressed();
@@ -137,9 +138,7 @@ protected:
 
 	// Internal Functions
 	void UpdateMovementState();
-	void HandleJump();
-	void HandleDash(float DeltaTime);
-	void HandleCrouch();
-	void ApplyMovement(float DeltaTime);
-	void ApplyAirControl(float DeltaTime);
+    void HandleJump();
+    void HandleDash(float DeltaTime);
+    void HandleCrouch();
 };

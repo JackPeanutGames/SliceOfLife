@@ -4,7 +4,7 @@
 
 UPlayerMovementComponent::UPlayerMovementComponent()
 {
-	PrimaryComponentTick.bCanEverTick = true;
+    PrimaryComponentTick.bCanEverTick = true;
 	
 	// Initialize default values
 	CurrentMovementState = EMovementState::Idle;
@@ -44,9 +44,9 @@ void UPlayerMovementComponent::TickComponent(float DeltaTime, ELevelTick TickTyp
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 	
-	HandleDash(DeltaTime);
-	UpdateMovementState();
-	ApplyMovement(DeltaTime);
+    HandleDash(DeltaTime);
+    UpdateMovementState();
+    // Movement is handled by CharacterMovement + AddMovementInput in the Character
 }
 
 void UPlayerMovementComponent::SetMovementInput(FVector2D Input)
@@ -66,11 +66,11 @@ void UPlayerMovementComponent::JumpPressed()
 
 void UPlayerMovementComponent::JumpReleased()
 {
-	// Allow for variable jump height
-	if (IsInAir() && Velocity.Z > 0.0f)
-	{
-		Velocity.Z *= 0.5f;
-	}
+    // Variable jump height using CharacterMovement's gravity: cut Z velocity when releasing
+    if (IsFalling() && Velocity.Z > 0.0f)
+    {
+        Velocity.Z *= 0.5f;
+    }
 }
 
 void UPlayerMovementComponent::DashPressed()
@@ -81,8 +81,10 @@ void UPlayerMovementComponent::DashPressed()
 		DashTimer = MovementSettings.DashDuration;
 		DashDirection = FVector(MovementInput.X, MovementInput.Y, 0.0f).GetSafeNormal();
 		
-		// Apply dash velocity
-		Velocity = DashDirection * MovementSettings.DashSpeed;
+        // Apply dash by setting a horizontal impulse
+        FVector NewVel = DashDirection * MovementSettings.DashSpeed;
+        NewVel.Z = Velocity.Z;
+        Velocity = NewVel;
 	}
 }
 
@@ -194,93 +196,18 @@ void UPlayerMovementComponent::HandleCrouch()
 	{
 		if (UCapsuleComponent* Capsule = OwnerCharacter->GetCapsuleComponent())
 		{
-			if (bIsCrouching)
-			{
-				// Crouch down
-				Capsule->SetCapsuleHalfHeight(OriginalCapsuleHalfHeight * 0.5f);
-				MaxWalkSpeed = MovementSettings.CrouchSpeed;
-			}
-			else
-			{
-				// Stand up
-				Capsule->SetCapsuleHalfHeight(OriginalCapsuleHalfHeight);
-				MaxWalkSpeed = MovementSettings.WalkSpeed;
-			}
+            if (bIsCrouching)
+            {
+                Capsule->SetCapsuleHalfHeight(OriginalCapsuleHalfHeight * 0.5f);
+                MaxWalkSpeed = MovementSettings.CrouchSpeed;
+            }
+            else
+            {
+                Capsule->SetCapsuleHalfHeight(OriginalCapsuleHalfHeight);
+                MaxWalkSpeed = MovementSettings.WalkSpeed;
+            }
 		}
 	}
 }
 
-void UPlayerMovementComponent::ApplyMovement(float DeltaTime)
-{
-	if (bIsDashing)
-	{
-		// Dash movement is handled in HandleDash
-		return;
-	}
-	
-	// Calculate movement direction
-	FVector MovementDirection = FVector(MovementInput.X, MovementInput.Y, 0.0f);
-	
-	if (!MovementDirection.IsNearlyZero())
-	{
-		// Get forward and right vectors
-		FVector Forward = GetOwner()->GetActorForwardVector();
-		FVector Right = GetOwner()->GetActorRightVector();
-		
-		// Calculate desired velocity
-		FVector DesiredVelocity = (Forward * MovementInput.X + Right * MovementInput.Y) * 
-			(bIsCrouching ? MovementSettings.CrouchSpeed : 
-			 (CurrentMovementState == EMovementState::Running ? MovementSettings.RunSpeed : MovementSettings.WalkSpeed));
-		
-		// Apply movement
-		if (IsGrounded())
-		{
-			Velocity.X = FMath::FInterpTo(Velocity.X, DesiredVelocity.X, DeltaTime, 8.0f);
-			Velocity.Y = FMath::FInterpTo(Velocity.Y, DesiredVelocity.Y, DeltaTime, 8.0f);
-		}
-		else
-		{
-			// Air control
-			ApplyAirControl(DeltaTime);
-		}
-	}
-	else
-	{
-		// Apply friction when no input
-		if (IsGrounded())
-		{
-			Velocity.X = FMath::FInterpTo(Velocity.X, 0.0f, DeltaTime, 12.0f);
-			Velocity.Y = FMath::FInterpTo(Velocity.Y, 0.0f, DeltaTime, 12.0f);
-		}
-	}
-}
-
-void UPlayerMovementComponent::ApplyAirControl(float DeltaTime)
-{
-	if (MovementInput.IsNearlyZero())
-	{
-		return;
-	}
-	
-	FVector MovementDirection = FVector(MovementInput.X, MovementInput.Y, 0.0f);
-	FVector Forward = GetOwner()->GetActorForwardVector();
-	FVector Right = GetOwner()->GetActorRightVector();
-	
-	// Calculate air movement
-	FVector AirMovement = (Forward * MovementInput.X + Right * MovementInput.Y) * 
-		MovementSettings.AirControl * MovementSettings.WalkSpeed * DeltaTime;
-	
-	// Apply air movement
-	Velocity += AirMovement;
-	
-	// Clamp air velocity
-	float MaxAirSpeed = MovementSettings.WalkSpeed * 0.8f;
-	FVector2D HorizontalVel(Velocity.X, Velocity.Y);
-	double HorzSize = HorizontalVel.Size();
-	if (HorzSize > MaxAirSpeed)
-	{
-		FVector2D ClampedVelocity = HorizontalVel / HorzSize * MaxAirSpeed;
-		Velocity.X = ClampedVelocity.X;
-		Velocity.Y = ClampedVelocity.Y;
-	}
-}
+// Manual velocity-based movement removed in favor of CharacterMovement input handling

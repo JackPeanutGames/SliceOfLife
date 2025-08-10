@@ -24,6 +24,7 @@ public:
 	virtual void BeginPlay() override;
     virtual void Tick(float DeltaTime) override;
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
+    virtual float TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser) override;
     virtual void PossessedBy(AController* NewController) override;
     virtual void OnRep_Controller() override;
 
@@ -119,6 +120,22 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera")
 	class UCameraComponent* FollowCamera;
+
+    // Designer-tunable movement settings applied to CharacterMovement
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Movement|Tuning")
+    float DesignerMaxWalkSpeed = 600.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Movement|Tuning")
+    float DesignerMaxWalkSpeedCrouched = 300.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Movement|Tuning")
+    float DesignerJumpZVelocity = 600.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Movement|Tuning")
+    float DesignerAirControl = 0.5f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Movement|Tuning")
+    float DesignerGravityScale = 1.0f;
 
 	// Movement State
 	UPROPERTY(BlueprintReadOnly, Category = "Movement")

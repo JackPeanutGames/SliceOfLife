@@ -12,6 +12,7 @@
 #include "GameFramework/Controller.h"
 #include "GameFramework/PlayerController.h"
 #include "Kismet/KismetSystemLibrary.h"
+#include "Kismet/GameplayStatics.h"
 
 APlayerCharacter::APlayerCharacter(const FObjectInitializer& ObjectInitializer)
     : Super(ObjectInitializer.SetDefaultSubobjectClass<UPlayerMovementComponent>(ACharacter::CharacterMovementComponentName))
@@ -82,6 +83,16 @@ void APlayerCharacter::BeginPlay()
 
     // Try to add mapping context at BeginPlay (controller may not be valid yet)
     AddDefaultMappingContext();
+
+    // Apply designer movement tuning at runtime to CharacterMovementComponent
+    if (UCharacterMovementComponent* Move = GetCharacterMovement())
+    {
+        Move->MaxWalkSpeed = DesignerMaxWalkSpeed;
+        Move->MaxWalkSpeedCrouched = DesignerMaxWalkSpeedCrouched;
+        Move->JumpZVelocity = DesignerJumpZVelocity;
+        Move->AirControl = DesignerAirControl;
+        Move->GravityScale = DesignerGravityScale;
+    }
 }
 
 void APlayerCharacter::Tick(float DeltaTime)
@@ -91,68 +102,7 @@ void APlayerCharacter::Tick(float DeltaTime)
     // Sync state from components for UI/logic
     UpdateCombatState();
 
-    // C++ minimal hit detection during attack
-    if (CombatComponent)
-    {
-        const EAttackState CurrentAttackState = CombatComponent->GetAttackState();
-
-        if (PreviousAttackState != EAttackState::Attacking && CurrentAttackState == EAttackState::Attacking)
-        {
-            bHasHitThisSwing = false;
-        }
-
-        if (CurrentAttackState == EAttackState::Attacking && !bHasHitThisSwing)
-        {
-            const FAttackData& Attack = CombatComponent->GetCurrentAttack();
-
-            // Compute world center for the hitbox
-            const FVector Forward = GetActorForwardVector();
-            const FVector Right = GetActorRightVector();
-            const FVector Up = GetActorUpVector();
-            const FVector Center = GetActorLocation() + 
-                Forward * Attack.HitboxOffset.X +
-                Right * Attack.HitboxOffset.Y +
-                Up * Attack.HitboxOffset.Z;
-
-            // Use a sphere overlap with radius based on HitboxSize
-            const float Radius = FMath::Max3(Attack.HitboxSize.X, Attack.HitboxSize.Y, Attack.HitboxSize.Z);
-
-            TArray<TEnumAsByte<EObjectTypeQuery>> ObjectTypes;
-            ObjectTypes.Add(UEngineTypes::ConvertToObjectType(ECollisionChannel::ECC_Pawn));
-
-            TArray<AActor*> ActorsToIgnore;
-            ActorsToIgnore.Add(this);
-
-            TArray<AActor*> OutActors;
-            const bool bAny = UKismetSystemLibrary::SphereOverlapActors(this, Center, Radius, ObjectTypes, AActor::StaticClass(), ActorsToIgnore, OutActors);
-
-            if (bAny)
-            {
-                for (AActor* HitActor : OutActors)
-                {
-                    if (!HitActor || HitActor == this)
-                    {
-                        continue;
-                    }
-
-                    // Find a HealthComponent on the hit actor
-                    UHealthComponent* TargetHealth = HitActor->FindComponentByClass<UHealthComponent>();
-                    if (TargetHealth)
-                    {
-                        TargetHealth->TakeDamage(
-                            Attack.Damage,
-                            Attack.KnockbackDirection,
-                            Attack.KnockbackForce,
-                            this);
-                    }
-                }
-
-                bHasHitThisSwing = true;
-            }
-        }
-
-        PreviousAttackState = CurrentAttackState;
-    }
+    // Damage handling is now via UE damage system and animation notifies.
 }
 
 void APlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -163,12 +113,12 @@ void APlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 	if (UEnhancedInputComponent* EnhancedInputComponent = CastChecked<UEnhancedInputComponent>(PlayerInputComponent))
 	{
 		// Movement
-		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &APlayerCharacter::OnMove);
-		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Completed, this, &APlayerCharacter::OnMove);
+        EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &APlayerCharacter::OnMove);
+        EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Completed, this, &APlayerCharacter::OnMove);
 
-		// Jump
-		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Triggered, this, &APlayerCharacter::OnJump);
-		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &APlayerCharacter::OnJumpReleased);
+        // Jump
+        EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Triggered, this, &APlayerCharacter::OnJump);
+        EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &APlayerCharacter::OnJumpReleased);
 
 		// Dash
 		EnhancedInputComponent->BindAction(DashAction, ETriggerEvent::Triggered, this, &APlayerCharacter::OnDash);
@@ -221,55 +171,49 @@ void APlayerCharacter::AddDefaultMappingContext()
 
 void APlayerCharacter::OnMove(const FInputActionValue& Value)
 {
-	if (PlayerMovementComponent)
-	{
-		FVector2D MovementVector = Value.Get<FVector2D>();
-		PlayerMovementComponent->SetMovementInput(MovementVector);
-
-		// Update movement state
-		bIsMoving = !MovementVector.IsNearlyZero();
-		bIsRunning = FMath::Abs(MovementVector.X) > 0.8f || FMath::Abs(MovementVector.Y) > 0.8f;
-	}
+    const FVector2D MovementVector = Value.Get<FVector2D>();
+    // Use built-in Character movement input
+    if (!MovementVector.IsNearlyZero())
+    {
+        AddMovementInput(GetActorForwardVector(), MovementVector.X);
+        AddMovementInput(GetActorRightVector(), MovementVector.Y);
+    }
+    bIsMoving = !MovementVector.IsNearlyZero();
+    bIsRunning = FMath::Abs(MovementVector.X) > 0.8f || FMath::Abs(MovementVector.Y) > 0.8f;
 }
 
 void APlayerCharacter::OnJump(const FInputActionValue& Value)
 {
-	if (PlayerMovementComponent && !bIsInHitstun)
-	{
-		PlayerMovementComponent->JumpPressed();
-	}
+    if (!bIsInHitstun)
+    {
+        Jump();
+    }
 }
 
 void APlayerCharacter::OnJumpReleased(const FInputActionValue& Value)
 {
-	if (PlayerMovementComponent)
-	{
-		PlayerMovementComponent->JumpReleased();
-	}
+    StopJumping();
 }
 
 void APlayerCharacter::OnDash(const FInputActionValue& Value)
 {
-	if (PlayerMovementComponent && !bIsInHitstun)
-	{
-		PlayerMovementComponent->DashPressed();
-	}
+    if (PlayerMovementComponent && !bIsInHitstun)
+    {
+        PlayerMovementComponent->DashPressed();
+    }
 }
 
 void APlayerCharacter::OnCrouch(const FInputActionValue& Value)
 {
-	if (PlayerMovementComponent && !bIsInHitstun)
-	{
-		PlayerMovementComponent->CrouchPressed();
-	}
+    if (!bIsInHitstun)
+    {
+        Crouch();
+    }
 }
 
 void APlayerCharacter::OnCrouchReleased(const FInputActionValue& Value)
 {
-	if (PlayerMovementComponent)
-	{
-		PlayerMovementComponent->CrouchReleased();
-	}
+    UnCrouch();
 }
 
 void APlayerCharacter::OnLightAttack(const FInputActionValue& Value)
@@ -345,4 +289,17 @@ void APlayerCharacter::UpdateCombatState()
 		bIsAttacking = CombatComponent->IsAttacking();
 		bIsCharging = CombatComponent->IsCharging();
 	}
+}
+
+float APlayerCharacter::TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
+{
+    const float Actual = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
+    if (HealthComponent && Actual > 0.f)
+    {
+        // For generic damage, use forward vector knockback as placeholder
+        const FVector KnockDir = GetActorForwardVector();
+        const float KnockForce = 600.f;
+        HealthComponent->TakeDamage(Actual, KnockDir, KnockForce, DamageCauser);
+    }
+    return Actual;
 }

@@ -115,26 +115,15 @@ void UHealthComponent::ResetHealth()
 
 void UHealthComponent::ApplyKnockback(FVector Direction, float Force)
 {
-	if (ACharacter* OwnerCharacter = Cast<ACharacter>(GetOwner()))
-	{
-		if (UCharacterMovementComponent* MovementComp = OwnerCharacter->GetCharacterMovement())
-		{
-			// Calculate knockback velocity
-			FVector KnockbackVelocity = Direction.GetSafeNormal() * Force;
-			
-			// Apply weight-based resistance
-			KnockbackVelocity /= WeightSettings.BaseKnockbackResistance;
-			
-			// Store knockback velocity for hitstun
-			CurrentKnockbackVelocity = KnockbackVelocity;
-			
-			// Apply to character movement
-			MovementComp->Velocity = KnockbackVelocity;
-			
-			UE_LOG(LogTemp, Log, TEXT("Applied knockback: Direction=%s, Force=%f, FinalVelocity=%s"), 
-				*Direction.ToString(), Force, *KnockbackVelocity.ToString());
-		}
-	}
+    if (ACharacter* OwnerCharacter = Cast<ACharacter>(GetOwner()))
+    {
+        // Calculate launch impulse
+        FVector LaunchVel = Direction.GetSafeNormal() * Force;
+        LaunchVel /= FMath::Max(WeightSettings.BaseKnockbackResistance, 0.01f);
+        CurrentKnockbackVelocity = LaunchVel;
+        OwnerCharacter->LaunchCharacter(LaunchVel, true, true);
+        UE_LOG(LogTemp, Log, TEXT("Applied knockback via LaunchCharacter: Dir=%s Force=%f Vel=%s"), *Direction.ToString(), Force, *LaunchVel.ToString());
+    }
 }
 
 void UHealthComponent::SetHitstun(float Duration)
@@ -183,8 +172,8 @@ void UHealthComponent::ApplyHitstunEffects()
 	{
 		if (UCharacterMovementComponent* MovementComp = OwnerCharacter->GetCharacterMovement())
 		{
-			// Disable movement input during hitstun
-			MovementComp->SetMovementMode(MOVE_Falling);
+            // Ensure physics-based reaction; prevent braking fighting the launch
+            MovementComp->DisableMovement();
 			
 			// Apply knockback velocity
 			if (!CurrentKnockbackVelocity.IsNearlyZero())
@@ -201,11 +190,7 @@ void UHealthComponent::ClearHitstunEffects()
 	{
 		if (UCharacterMovementComponent* MovementComp = OwnerCharacter->GetCharacterMovement())
 		{
-			// Re-enable normal movement
-			if (MovementComp->IsFalling())
-			{
-				MovementComp->SetMovementMode(MOVE_Walking);
-			}
+            MovementComp->SetMovementMode(MOVE_Walking);
 		}
 	}
 }

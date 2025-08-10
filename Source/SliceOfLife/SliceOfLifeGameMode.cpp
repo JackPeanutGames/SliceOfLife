@@ -4,6 +4,10 @@
 #include "Kismet/GameplayStatics.h"
 #include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
+#include "GameFramework/GameStateBase.h"
+#include "SliceOfLifeGameState.h"
+#include "SliceOfLifePlayerController.h"
+#include "SliceOfLifePlayerState.h"
 
 ASliceOfLifeGameMode::ASliceOfLifeGameMode()
 {
@@ -16,8 +20,11 @@ ASliceOfLifeGameMode::ASliceOfLifeGameMode()
 	bCheckpointSet = false;
 	CurrentPlayer = nullptr;
 	
-	// Set default player class
-	DefaultPawnClass = APlayerCharacter::StaticClass();
+    // Set default classes
+    DefaultPawnClass = APlayerCharacter::StaticClass();
+    PlayerControllerClass = ASliceOfLifePlayerController::StaticClass();
+    GameStateClass = ASliceOfLifeGameState::StaticClass();
+    PlayerStateClass = ASliceOfLifePlayerState::StaticClass();
 }
 
 void ASliceOfLifeGameMode::BeginPlay()
@@ -37,7 +44,7 @@ void ASliceOfLifeGameMode::Tick(float DeltaTime)
 void ASliceOfLifeGameMode::InitializeGame()
 {
 	// Set initial checkpoint to player start
-	if (APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0))
+    if (APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0))
 	{
 		if (APlayerCharacter* Player = Cast<APlayerCharacter>(PC->GetPawn()))
 		{
@@ -142,6 +149,12 @@ void ASliceOfLifeGameMode::ChangeArea(const FString& AreaName)
 	{
 		FString OldArea = CurrentArea;
 		CurrentArea = AreaName;
+
+        // Update replicated GameState area name
+        if (ASliceOfLifeGameState* GS = GetGameState<ASliceOfLifeGameState>())
+        {
+            GS->CurrentAreaName = AreaName;
+        }
 		
 		// Save game state before area change
 		SaveGameState();

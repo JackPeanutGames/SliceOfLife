@@ -6,6 +6,8 @@
 #include "GameFramework/Character.h"
 #include "TimerManager.h"
 #include "Kismet/GameplayStatics.h"
+#include "DrawDebugHelpers.h"
+#include "Animation/AnimInstance.h"
 
 UCombatComponent::UCombatComponent()
 {
@@ -174,6 +176,37 @@ void UCombatComponent::StartAttack(const FAttackData& AttackData)
 		AttackData.AttackDuration * 0.5f, // Spawn hitbox halfway through attack
 		false
 	);
+
+    // Play montage if available
+    if (ACharacter* OwnerChar = Cast<ACharacter>(GetOwner()))
+    {
+        if (UAnimInstance* AnimInst = OwnerChar->GetMesh() ? OwnerChar->GetMesh()->GetAnimInstance() : nullptr)
+        {
+            UAnimMontage* MontageToPlay = nullptr;
+            switch (AttackData.AttackType)
+            {
+            case EAttackType::Light: MontageToPlay = LightMontage; break;
+            case EAttackType::Tilt: MontageToPlay = TiltMontage; break;
+            case EAttackType::Aerial: MontageToPlay = AerialMontage; break;
+            case EAttackType::Smash: MontageToPlay = SmashMontage; break;
+            default: break;
+            }
+            if (MontageToPlay)
+            {
+                FOnMontageEnded MontageEnded;
+                MontageEnded.BindLambda([this](UAnimMontage*, bool)
+                {
+                    if (CurrentAttackState == EAttackState::Attacking)
+                    {
+                        // Ensure we go to recovery/end when montage ends
+                        EndAttack();
+                    }
+                });
+                AnimInst->Montage_Play(MontageToPlay, MontagePlayRate);
+                AnimInst->Montage_SetEndDelegate(MontageEnded, MontageToPlay);
+            }
+        }
+    }
 }
 
 void UCombatComponent::UpdateAttack(float DeltaTime)
@@ -225,12 +258,27 @@ void UCombatComponent::EndAttack()
 
 void UCombatComponent::SpawnHitbox()
 {
-	// Placeholder for spawning hitbox logic
+    // Designers will add UAnimNotify(States) to montages to call ApplyDamage at correct frames.
+    // Fallback: simple point damage at owner forward hitbox for prototyping.
+    if (AActor* OwnerActor = GetOwner())
+    {
+        const FVector Start = OwnerActor->GetActorLocation();
+        const FVector End = Start + OwnerActor->GetActorForwardVector() * 150.f;
+        FHitResult Hit;
+        FCollisionQueryParams Params(SCENE_QUERY_STAT(Attack), false, OwnerActor);
+        if (OwnerActor->GetWorld()->LineTraceSingleByChannel(Hit, Start, End, ECC_Visibility, Params))
+        {
+            if (AActor* HitActor = Hit.GetActor())
+            {
+                UGameplayStatics::ApplyPointDamage(HitActor, CurrentAttack.Damage, OwnerActor->GetActorForwardVector(), Hit, nullptr, OwnerActor, nullptr);
+            }
+        }
+    }
 }
 
 void UCombatComponent::DetectHits()
 {
-	// Placeholder for hit detection logic
+    // Montages + anim notifies should drive precise hit detection; not used by default
 }
 
 float UCombatComponent::CalculateStaleMultiplier(const FString& MoveName)

@@ -5,6 +5,9 @@
 #include "SliceOfLifeGameMode.generated.h"
 
 class APlayerCharacter;
+class ASliceOfLifeGameState;
+class ASliceOfLifePlayerState;
+class ASliceOfLifePlayerController;
 class UGameplayStatics;
 
 UCLASS(Blueprintable)
@@ -25,7 +28,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Game Mode")
 	void RestartLevel();
 
-	// Game State Management
+    // Game State Management
 	UFUNCTION(BlueprintCallable, Category = "Game Mode")
 	void PauseGame();
 
@@ -42,12 +45,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Game Mode")
 	void LoadCheckpoint();
 
-	// Area/Level Management
+    // Area/Level Management
 	UFUNCTION(BlueprintCallable, Category = "Game Mode")
 	void ChangeArea(const FString& AreaName);
 
 	UFUNCTION(BlueprintCallable, Category = "Game Mode")
-	FString GetCurrentArea() const { return CurrentArea; }
+    FString GetCurrentArea() const { return CurrentArea; }
 
 	// Events
 	UFUNCTION(BlueprintImplementableEvent, Category = "Game Mode")
@@ -60,15 +63,16 @@ public:
 	void OnAreaChanged(const FString& NewArea);
 
 protected:
-	// Game State
-	UPROPERTY(BlueprintReadOnly, Category = "Game Mode")
-	bool bGamePaused;
+    // Game State flags
+    UPROPERTY(BlueprintReadOnly, Category = "Game Mode")
+    bool bGamePaused;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Game Mode")
 	bool bGameOver;
 
-	UPROPERTY(BlueprintReadOnly, Category = "Game Mode")
-	FString CurrentArea;
+    // Legacy: kept for BP compatibility; value should mirror GameState's replicated value
+    UPROPERTY(BlueprintReadOnly, Category = "Game Mode")
+    FString CurrentArea;
 
 	// Checkpoint System
 	UPROPERTY(BlueprintReadOnly, Category = "Game Mode")

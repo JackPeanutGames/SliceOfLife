@@ -158,6 +158,22 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat")
 	bool bEnableMoveStaling = true;
 
+    // Animation montages for each attack type (assigned by designers)
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Animation")
+    class UAnimMontage* LightMontage;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Animation")
+    class UAnimMontage* TiltMontage;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Animation")
+    class UAnimMontage* AerialMontage;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Animation")
+    class UAnimMontage* SmashMontage;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Animation")
+    float MontagePlayRate = 1.0f;
+
 protected:
 	// Combat State
 	UPROPERTY(BlueprintReadOnly, Category = "Combat")
@@ -183,8 +199,8 @@ protected:
 	void StartAttack(const FAttackData& AttackData);
 	void UpdateAttack(float DeltaTime);
 	void EndAttack();
-	void SpawnHitbox();
-	void DetectHits();
+    void SpawnHitbox();
+    void DetectHits();
 	float CalculateStaleMultiplier(const FString& MoveName);
 	void UpdateMoveStaling(float DeltaTime);
 	FAttackData* GetAttackData(EAttackType AttackType, const FVector2D& Direction = FVector2D::ZeroVector);

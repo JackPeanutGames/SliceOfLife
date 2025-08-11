@@ -17,7 +17,6 @@ public class SliceOfLife : ModuleRules
 			"Slate",
 			"SlateCore",
 			"UMG",
-			"UMGEditor",
 			"GameplayTasks",
 			"NavigationSystem",
 			"AIModule"

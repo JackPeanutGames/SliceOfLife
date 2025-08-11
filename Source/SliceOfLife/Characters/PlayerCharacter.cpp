@@ -68,6 +68,9 @@ APlayerCharacter::APlayerCharacter(const FObjectInitializer& ObjectInitializer)
 
     PreviousAttackState = EAttackState::Idle;
     bHasHitThisSwing = false;
+
+    // Default to 2.5D constraint at construction time
+    ApplyPlaneConstraintSettings();
 }
 
 void APlayerCharacter::BeginPlay()
@@ -92,6 +95,8 @@ void APlayerCharacter::BeginPlay()
         Move->JumpZVelocity = DesignerJumpZVelocity;
         Move->AirControl = DesignerAirControl;
         Move->GravityScale = DesignerGravityScale;
+        // Re-apply plane constraint in case designers changed the toggle pre-Play
+        ApplyPlaneConstraintSettings();
     }
 }
 
@@ -166,6 +171,17 @@ void APlayerCharacter::AddDefaultMappingContext()
                 Subsystem->AddMappingContext(DefaultMappingContext, 0);
             }
         }
+    }
+}
+
+void APlayerCharacter::ApplyPlaneConstraintSettings()
+{
+    if (UCharacterMovementComponent* Move = GetCharacterMovement())
+    {
+        Move->bConstrainToPlane = bConstrainToYPlane;
+        Move->SetPlaneConstraintNormal(FVector(0.f, 1.f, 0.f));
+        Move->SetPlaneConstraintOrigin(FVector::ZeroVector);
+        Move->SetPlaneConstraintEnabled(bConstrainToYPlane);
     }
 }
 

@@ -121,6 +121,10 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera")
 	class UCameraComponent* FollowCamera;
 
+    // 2.5D constraint toggle — if true, constrains movement to Y=0 plane
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|PlaneConstraint")
+    bool bConstrainToYPlane = true;
+
     // Designer-tunable movement settings applied to CharacterMovement
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Movement|Tuning")
     float DesignerMaxWalkSpeed = 600.0f;
@@ -165,6 +169,7 @@ protected:
 	// Internal
 	void UpdateCombatState();
     void AddDefaultMappingContext();
+    void ApplyPlaneConstraintSettings();
 
 public:
 	// Component Getters

@@ -4,6 +4,9 @@
 #include "GameFramework/PlayerController.h"
 #include "SliceOfLifePlayerController.generated.h"
 
+class UUserWidget;
+class ASliceOfLifePlayerState;
+
 UCLASS()
 class SLICEOFLIFE_API ASliceOfLifePlayerController : public APlayerController
 {
@@ -18,6 +21,37 @@ public:
 
     UFUNCTION(BlueprintCallable, Category = "UI")
     void UpdatePlayerStateDisplay(float DamagePercent, const FString& StateLabel, FVector2D Velocity);
+
+    // Debug/tuning widget creation in C++ (optional path)
+    UFUNCTION(BlueprintCallable, Category = "UI")
+    void CreateDebugWidgetsNative();
+
+    // Slider callbacks (examples)
+    UFUNCTION(BlueprintCallable, Category = "UI|Tuning")
+    void OnGravityChanged(float NewValue);
+
+    UFUNCTION(BlueprintCallable, Category = "UI|Tuning")
+    void OnFrictionChanged(float NewValue);
+
+    UFUNCTION(BlueprintCallable, Category = "UI|Tuning")
+    void OnPlayerSpeedChanged(float NewValue);
+
+protected:
+    // Optional native widget classes (set in BP defaults if desired)
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "UI")
+    TSubclassOf<UUserWidget> StateDisplayClass;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "UI")
+    TSubclassOf<UUserWidget> TuningPanelClass;
+
+    UPROPERTY(Transient)
+    UUserWidget* StateDisplayWidget;
+
+    UPROPERTY(Transient)
+    UUserWidget* TuningPanelWidget;
+
+    UFUNCTION()
+    void OnPlayerDamagePercentChanged(float NewDamagePercent);
 };
 
 

@@ -1,16 +1,20 @@
 #include "EnemyBase.h"
 #include "SliceOfLife/Components/HealthComponent.h"
 #include "SliceOfLife/Components/CombatComponent.h"
-#include "Perception/PawnSensingComponent.h"
+#include "Perception/AIPerceptionComponent.h"
+#include "Perception/AISenseConfig_Sight.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "AIController.h"
+#include "Animation/AnimInstance.h"
 #include "PlayerCharacter.h"
 #include "Navigation/PathFollowingComponent.h"
 #include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
 #include "TimerManager.h"
+#include "BehaviorTree/BlackboardComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "SliceOfLife/AI/EnemyAIController.h"
 #include "UObject/ConstructorHelpers.h"
 
 AEnemyBase::AEnemyBase()
@@ -19,7 +23,8 @@ AEnemyBase::AEnemyBase()
 
 	// Create components
 	HealthComponent = CreateDefaultSubobject<UHealthComponent>(TEXT("HealthComponent"));
-	PawnSensingComponent = CreateDefaultSubobject<UPawnSensingComponent>(TEXT("PawnSensingComponent"));
+    AIPerceptionComponent = CreateDefaultSubobject<UAIPerceptionComponent>(TEXT("AIPerception"));
+    SightConfig = CreateDefaultSubobject<UAISenseConfig_Sight>(TEXT("SightConfig"));
 
     // Visual placeholders
     PlaceholderBody = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("PlaceholderBody"));
@@ -50,10 +55,22 @@ AEnemyBase::AEnemyBase()
         Capsule->InitCapsuleSize(40.0f, 100.0f); // radius, half-height
     }
 
-	// Setup pawn sensing
-	PawnSensingComponent->SightRadius = 800.0f;
-	PawnSensingComponent->SetPeripheralVisionAngle(90.0f);
-	PawnSensingComponent->bOnlySensePlayers = true;
+    // Configure AI Perception (Sight)
+    if (SightConfig)
+    {
+        SightConfig->SightRadius = 800.0f;
+        SightConfig->LoseSightRadius = 900.0f;
+        SightConfig->PeripheralVisionAngleDegrees = 90.0f;
+        SightConfig->DetectionByAffiliation.bDetectEnemies = true;
+        SightConfig->DetectionByAffiliation.bDetectFriendlies = true;
+        SightConfig->DetectionByAffiliation.bDetectNeutrals = true;
+    }
+    if (AIPerceptionComponent)
+    {
+        AIPerceptionComponent->ConfigureSense(*SightConfig);
+        AIPerceptionComponent->SetDominantSense(SightConfig->GetSenseImplementation());
+        AIPerceptionComponent->OnPerceptionUpdated.AddDynamic(this, &AEnemyBase::OnPerceptionUpdated);
+    }
 
 	// Initialize state
 	CurrentState = EEnemyState::Idle;
@@ -64,6 +81,22 @@ AEnemyBase::AEnemyBase()
 
 	// Set default stats
 	EnemyStats = FEnemyStats();
+
+    // Create combat component
+    CombatComponent = CreateDefaultSubobject<UCombatComponent>(TEXT("CombatComponent"));
+
+    // Default to 2.5D constraint at construction time
+    if (UCharacterMovementComponent* Move = GetCharacterMovement())
+    {
+        Move->bConstrainToPlane = true;
+        Move->SetPlaneConstraintNormal(FVector(0.f, 1.f, 0.f));
+        Move->SetPlaneConstraintOrigin(FVector::ZeroVector);
+        Move->SetPlaneConstraintEnabled(true);
+    }
+
+    // Ensure AI controller is used when placed/spawned
+    AIControllerClass = AEnemyAIController::StaticClass();
+    AutoPossessAI = EAutoPossessAI::PlacedInWorldOrSpawned;
 }
 
 void AEnemyBase::BeginPlay()
@@ -80,13 +113,32 @@ void AEnemyBase::BeginPlay()
 		HealthComponent->OnDamageReceived.AddDynamic(this, &AEnemyBase::OnDamageReceived);
 	}
 
-	if (PawnSensingComponent)
-	{
-		PawnSensingComponent->OnSeePawn.AddDynamic(this, &AEnemyBase::OnPawnSeen);
-	}
+    // Perception binding is handled in constructor
 
 	// Start patrolling
 	StartPatrolling();
+
+    // Ensure plane constraint is applied according to toggle
+    if (UCharacterMovementComponent* Move = GetCharacterMovement())
+    {
+        Move->bConstrainToPlane = bConstrainToYPlane;
+        Move->SetPlaneConstraintNormal(FVector(0.f, 1.f, 0.f));
+        Move->SetPlaneConstraintOrigin(FVector::ZeroVector);
+        Move->SetPlaneConstraintEnabled(bConstrainToYPlane);
+    }
+
+    // If AIController is already possessing, ensure BT starts (safety in case OnPossess ran before asset assignment)
+    if (AEnemyAIController* AI = Cast<AEnemyAIController>(GetController()))
+    {
+        if (GetBlackboardData() && AI->GetBlackboardComponent())
+        {
+            AI->GetBlackboardComponent()->InitializeBlackboard(*const_cast<UBlackboardData*>(GetBlackboardData()));
+        }
+        if (GetBehaviorTree())
+        {
+            AI->RunBehaviorTree(const_cast<UBehaviorTree*>(GetBehaviorTree()));
+        }
+    }
 }
 
 void AEnemyBase::Tick(float DeltaTime)
@@ -177,8 +229,30 @@ void AEnemyBase::StopMovement()
 
 void AEnemyBase::PerformAttack()
 {
-	// This can be overridden in derived classes or implemented with behavior trees
-	UE_LOG(LogTemp, Log, TEXT("Enemy %s performing attack"), *GetName());
+    UE_LOG(LogTemp, Log, TEXT("Enemy %s performing attack"), *GetName());
+
+    // Play assigned attack montage if available
+    if (AttackMontage && GetMesh())
+    {
+        if (UAnimInstance* AnimInst = GetMesh()->GetAnimInstance())
+        {
+            FOnMontageEnded MontageEnded;
+            MontageEnded.BindLambda([this](UAnimMontage* Montage, bool bInterrupted)
+            {
+                // After attack finishes, resume chasing if target valid
+                if (CurrentTarget && IsValid(CurrentTarget))
+                {
+                    SetEnemyState(EEnemyState::Chasing);
+                }
+                else
+                {
+                    SetEnemyState(EEnemyState::Patrolling);
+                }
+            });
+            AnimInst->Montage_Play(AttackMontage, 1.0f);
+            AnimInst->Montage_SetEndDelegate(MontageEnded, AttackMontage);
+        }
+    }
 }
 
 bool AEnemyBase::CanAttack() const
@@ -294,14 +368,28 @@ bool AEnemyBase::IsTargetInRange(AActor* Target, float Range) const
 	return Distance <= Range;
 }
 
-void AEnemyBase::OnPawnSeen(APawn* SeenPawn)
+void AEnemyBase::OnPerceptionUpdated(const TArray<AActor*>& UpdatedActors)
 {
-	// Check if the seen pawn is a player
-	if (APlayerCharacter* Player = Cast<APlayerCharacter>(SeenPawn))
-	{
-		// Start chasing the player
-		StartChasing(Player);
-	}
+    // Find best perceived player target
+    AActor* BestPlayer = nullptr;
+    float BestDistSq = FLT_MAX;
+    for (AActor* Actor : UpdatedActors)
+    {
+        if (!IsValid(Actor)) continue;
+        if (APlayerCharacter* Player = Cast<APlayerCharacter>(Actor))
+        {
+            const float DistSq = FVector::DistSquared(Player->GetActorLocation(), GetActorLocation());
+            if (DistSq < BestDistSq)
+            {
+                BestDistSq = DistSq;
+                BestPlayer = Player;
+            }
+        }
+    }
+    if (BestPlayer)
+    {
+        StartChasing(BestPlayer);
+    }
 }
 
 void AEnemyBase::OnDamageReceived(float Damage, FVector KnockbackDirection, float KnockbackForce)

@@ -8,7 +8,8 @@
 
 class UBehaviorTree;
 class UBlackboardData;
-class UPawnSensingComponent;
+class UAIPerceptionComponent;
+class UAISenseConfig_Sight;
 class UStaticMeshComponent;
 
 UENUM(BlueprintType)
@@ -102,6 +103,20 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Enemy Combat")
 	bool CanAttack() const;
 
+    // AI Controller & BT
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Enemy AI")
+    TSubclassOf<class AAIController> AIControllerClassOverride;
+
+    // Accessors for AI assets and tunables
+    UFUNCTION(BlueprintPure, Category = "Enemy AI")
+    const UBehaviorTree* GetBehaviorTree() const { return BehaviorTree; }
+
+    UFUNCTION(BlueprintPure, Category = "Enemy AI")
+    const UBlackboardData* GetBlackboardData() const { return BlackboardData; }
+
+    UFUNCTION(BlueprintPure, Category = "Enemy Stats")
+    const FEnemyStats& GetEnemyStats() const { return EnemyStats; }
+
 	// Events
 	UFUNCTION(BlueprintImplementableEvent, Category = "Enemy Events")
 	void OnEnemyStateChanged(EEnemyState OldState, EEnemyState NewState);
@@ -117,8 +132,14 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	UHealthComponent* HealthComponent;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Enemy AI")
-	UPawnSensingComponent* PawnSensingComponent;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+    UCombatComponent* CombatComponent;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Enemy AI")
+    UAIPerceptionComponent* AIPerceptionComponent;
+
+    UPROPERTY()
+    UAISenseConfig_Sight* SightConfig;
 
     // Placeholder visual: 2m tall human enemy, sphere body (2m diameter) with a small head sphere
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Visuals")
@@ -133,6 +154,14 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Enemy AI")
 	UBlackboardData* BlackboardData;
+
+    // Animation
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enemy Combat")
+    class UAnimMontage* AttackMontage;
+
+    // 2.5D constraint toggle — if true, constrains movement to Y=0 plane
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|PlaneConstraint")
+    bool bConstrainToYPlane = true;
 
 	// Enemy State
 	UPROPERTY(BlueprintReadOnly, Category = "Enemy AI")
@@ -164,9 +193,9 @@ protected:
     void FindNewPatrolTarget();
     bool IsTargetInRange(AActor* Target, float Range) const;
 
-    // Must be UFUNCTION for AddDynamic binding
+    // Perception callback
     UFUNCTION()
-    void OnPawnSeen(APawn* SeenPawn);
+    void OnPerceptionUpdated(const TArray<AActor*>& UpdatedActors);
 
     // Must be UFUNCTION for AddDynamic binding (matches FOnDamageReceived signature)
     UFUNCTION()

@@ -355,6 +355,15 @@ void AEnemyBase::FindNewPatrolTarget()
 	
 	FVector Offset = FVector(FMath::Cos(Angle) * Distance, FMath::Sin(Angle) * Distance, 0.0f);
 	CurrentPatrolTarget = PatrolCenter + Offset;
+
+    // Update blackboard with the new patrol location if available
+    if (AEnemyAIController* AI = Cast<AEnemyAIController>(GetController()))
+    {
+        if (UBlackboardComponent* BB = AI->GetBlackboardComponent())
+        {
+            BB->SetValueAsVector(AEnemyAIController::PatrolLocationKey, CurrentPatrolTarget);
+        }
+    }
 }
 
 bool AEnemyBase::IsTargetInRange(AActor* Target, float Range) const

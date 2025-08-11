@@ -12,6 +12,7 @@ USliceOfLifeAnimInstance::USliceOfLifeAnimInstance()
     , bIsCharging(false)
     , bIsInHitstun(false)
     , MovementDirection(0.f)
+    , bIsDoubleJump(false)
     , CachedPlayerCharacter(nullptr)
     , CachedMovementComponent(nullptr)
 {
@@ -83,6 +84,8 @@ void USliceOfLifeAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 
     // Optional direction for blend spaces
     MovementDirection = CalculateDirection(Velocity, OwnerPawn->GetActorRotation());
+
+    // Optional double-jump flag: leave as-is (to be set by character on second jump) unless you want to derive from movement component state
 }
 
 

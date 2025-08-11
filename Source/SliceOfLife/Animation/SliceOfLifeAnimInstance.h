@@ -46,6 +46,10 @@ protected:
     UPROPERTY(BlueprintReadOnly, Category = "Animation|Movement")
     float MovementDirection;
 
+    // Optional: Double jump state (set from code or BP when second jump is triggered)
+    UPROPERTY(BlueprintReadOnly, Category = "Animation|Movement")
+    bool bIsDoubleJump;
+
 private:
     // Cached owning character for quick access
     UPROPERTY(Transient)

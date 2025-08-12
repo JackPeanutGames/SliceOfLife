@@ -95,4 +95,9 @@ void USliceOfLifeAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
     // Optional double-jump flag: leave as-is (to be set by character on second jump) unless you want to derive from movement component state
 }
 
+void USliceOfLifeAnimInstance::SetFacingRight(bool bRight)
+{
+    bFacingRight = bRight;
+}
+
 

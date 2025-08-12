@@ -317,10 +317,24 @@ void UCombatComponent::SpawnHitboxParams(const FVector& LocalOffset, const FVect
     if (AActor* OwnerActor = GetOwner())
     {
         // Compute world center from local offset
-        const FVector Center = OwnerActor->GetActorLocation() 
-            + OwnerActor->GetActorForwardVector() * LocalOffset.X
-            + OwnerActor->GetActorRightVector() * LocalOffset.Y
-            + OwnerActor->GetActorUpVector() * LocalOffset.Z;
+        // Use mesh transform so local offsets respect mesh-only yaw flips
+        USceneComponent* RefComp = nullptr;
+        if (ACharacter* OwnerCharC = Cast<ACharacter>(OwnerActor))
+        {
+            RefComp = OwnerCharC->GetMesh();
+        }
+        if (!RefComp)
+        {
+            RefComp = OwnerActor->GetRootComponent();
+        }
+        FVector Center = RefComp->GetComponentLocation() + RefComp->GetComponentTransform().TransformVector(LocalOffset);
+        // Nudge the spawn forward relative to gameplay-facing by ~150 units
+        FVector ForwardForSpawn = OwnerActor->GetActorForwardVector();
+        if (const APlayerCharacter* PlayerChar = Cast<APlayerCharacter>(OwnerActor))
+        {
+            ForwardForSpawn = PlayerChar->GetFacingVector();
+        }
+        Center += ForwardForSpawn * 150.f;
 
         // Store parameters for overlap callback (single active hitbox recommended)
         PendingHitboxLocalOffset = LocalOffset;
@@ -334,7 +348,7 @@ void UCombatComponent::SpawnHitboxParams(const FVector& LocalOffset, const FVect
         {
             return;
         }
-        Hitbox->AttachToComponent(OwnerActor->GetRootComponent(), FAttachmentTransformRules::KeepWorldTransform);
+        Hitbox->AttachToComponent(RefComp, FAttachmentTransformRules::KeepWorldTransform);
         Hitbox->RegisterComponent();
         Hitbox->SetBoxExtent(BoxExtent, true);
         Hitbox->SetWorldLocation(Center);

@@ -14,6 +14,7 @@
 #include "Kismet/KismetSystemLibrary.h"
 #include "Kismet/GameplayStatics.h"
 #include "DrawDebugHelpers.h"
+#include "SliceOfLife/Animation/SliceOfLifeAnimInstance.h"
 
 APlayerCharacter::APlayerCharacter(const FObjectInitializer& ObjectInitializer)
     : Super(ObjectInitializer.SetDefaultSubobjectClass<UPlayerMovementComponent>(ACharacter::CharacterMovementComponentName))
@@ -110,7 +111,11 @@ void APlayerCharacter::BeginPlay()
         Move->GravityScale = DesignerGravityScale;
         // Re-apply plane constraint in case designers changed the toggle pre-Play
         ApplyPlaneConstraintSettings();
+        Move->bOrientRotationToMovement = false;
     }
+
+    // Normalize actor yaw so PlayerStart rotation doesn't affect side-scroller forward
+    SetActorRotation(FRotator(0.f, 0.f, 0.f));
 }
 
 void APlayerCharacter::Tick(float DeltaTime)
@@ -135,11 +140,14 @@ void APlayerCharacter::Tick(float DeltaTime)
             DrawDebugCapsule(GetWorld(), Location, HalfHeight, Radius, FQuat::Identity, FColor::Blue, false, 0.f, 0, 1.5f);
         }
     }
-    // Safety: flip by velocity if input released but we are still moving horizontally
-    const FVector Vel = GetVelocity();
-    if (FMath::Abs(Vel.X) > 5.f)
+    // Only auto-flip by velocity when NOT attacking (prevents montage jank)
+    if (!bIsAttacking)
     {
-        SetFacing(Vel.X > 0.f);
+        const FVector Vel = GetVelocity();
+        if (FMath::Abs(Vel.X) > 5.f)
+        {
+            SetFacing(Vel.X > 0.f);
+        }
     }
 }
 
@@ -153,7 +161,14 @@ void APlayerCharacter::SetFacing(bool bRight)
     if (USkeletalMeshComponent* MeshComp = GetMesh())
     {
         constexpr float BaseYawOffset = 90.f; // Mesh's rest orientation offset
-        MeshComp->SetRelativeRotation(FRotator(0.f, BaseYawOffset + (bFacingRight ? 0.f : 180.f), 0.f));
+        // Invert the mapping so visuals match movement (A=left, D=right)
+        const float VisualYaw = BaseYawOffset + (bFacingRight ? 180.f : 0.f);
+        MeshComp->SetRelativeRotation(FRotator(0.f, VisualYaw, 0.f));
+
+        if (USliceOfLifeAnimInstance* Anim = Cast<USliceOfLifeAnimInstance>(MeshComp->GetAnimInstance()))
+        {
+            Anim->SetFacingRight(bFacingRight);
+        }
     }
 }
 
@@ -235,11 +250,11 @@ void APlayerCharacter::ApplyPlaneConstraintSettings()
 void APlayerCharacter::OnMove(const FInputActionValue& Value)
 {
     const FVector2D MovementVector = Value.Get<FVector2D>();
-    // Use built-in Character movement input
+    // Side-scroller: drive world-X; ignore world-Y (plane constrained); optional: Y maps to vertical (Z)
     if (!MovementVector.IsNearlyZero())
     {
-        AddMovementInput(GetActorForwardVector(), MovementVector.X);
-        AddMovementInput(GetActorRightVector(), MovementVector.Y);
+        AddMovementInput(FVector(1.f, 0.f, 0.f), MovementVector.X);
+        // If vertical input needed: AddMovementInput(FVector(0.f, 0.f, 1.f), MovementVector.Y);
     }
     bIsMoving = !MovementVector.IsNearlyZero();
     bIsRunning = FMath::Abs(MovementVector.X) > 0.8f || FMath::Abs(MovementVector.Y) > 0.8f;

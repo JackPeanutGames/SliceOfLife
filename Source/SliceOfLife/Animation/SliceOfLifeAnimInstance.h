@@ -18,6 +18,9 @@ public:
     virtual void NativeInitializeAnimation() override;
     virtual void NativeUpdateAnimation(float DeltaSeconds) override;
 
+    UFUNCTION(BlueprintCallable, Category = "Animation|Facing")
+    void SetFacingRight(bool bRight);
+
 protected:
     // Movement
     UPROPERTY(BlueprintReadOnly, Category = "Animation|Movement")

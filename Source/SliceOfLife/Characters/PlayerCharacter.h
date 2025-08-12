@@ -202,6 +202,13 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Combat")
 	bool IsCharging() const { return bIsCharging; }
 
+    // Facing helpers for gameplay math (world X +/-)
+    UFUNCTION(BlueprintCallable, Category = "Facing")
+    FVector GetFacingVector() const { return FVector(bFacingRight ? 1.f : -1.f, 0.f, 0.f); }
+
+    UFUNCTION(BlueprintCallable, Category = "Facing")
+    int32 GetFacingSign() const { return bFacingRight ? 1 : -1; }
+
 	UFUNCTION(BlueprintPure, Category = "Health")
 	bool IsInHitstun() const { return bIsInHitstun; }
 

@@ -45,14 +45,19 @@ APlayerCharacter::APlayerCharacter(const FObjectInitializer& ObjectInitializer)
         PlaceholderBody->SetGenerateOverlapEvents(false);
     }
 
-	// Setup camera boom
+    // Setup camera boom
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(RootComponent);
 	CameraBoom->TargetArmLength = 600.0f;
-	CameraBoom->SetRelativeRotation(FRotator(-20.0f, 0.0f, 0.0f));
-	CameraBoom->bDoCollisionTest = false;
-	CameraBoom->bEnableCameraLag = true;
-	CameraBoom->CameraLagSpeed = 3.0f;
+    CameraBoom->bDoCollisionTest = false;
+    CameraBoom->bEnableCameraLag = true;
+    CameraBoom->CameraLagSpeed = 3.0f;
+    CameraBoom->bUsePawnControlRotation = false;
+    CameraBoom->bInheritPitch = false;
+    CameraBoom->bInheritYaw = false;
+    CameraBoom->bInheritRoll = false;
+    CameraBoom->SetUsingAbsoluteRotation(true);
+    CameraBoom->SetRelativeRotation(FRotator(-20.f, 0.f, 0.f));
 
 	// Setup follow camera
 	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
@@ -134,13 +139,7 @@ void APlayerCharacter::Tick(float DeltaTime)
     const FVector Vel = GetVelocity();
     if (FMath::Abs(Vel.X) > 5.f)
     {
-        const bool bRight = Vel.X > 0.f;
-        if (bRight != bFacingRight)
-        {
-            bFacingRight = bRight;
-            const float TargetYaw = bFacingRight ? 0.f : 180.f;
-            SetActorRotation(FRotator(0.f, TargetYaw, 0.f));
-        }
+        SetFacing(Vel.X > 0.f);
     }
 }
 
@@ -151,8 +150,11 @@ void APlayerCharacter::SetFacing(bool bRight)
         return;
     }
     bFacingRight = bRight;
-    const float TargetYaw = bFacingRight ? 0.f : 180.f;
-    SetActorRotation(FRotator(0.f, TargetYaw, 0.f));
+    if (USkeletalMeshComponent* MeshComp = GetMesh())
+    {
+        constexpr float BaseYawOffset = 90.f; // Mesh's rest orientation offset
+        MeshComp->SetRelativeRotation(FRotator(0.f, BaseYawOffset + (bFacingRight ? 0.f : 180.f), 0.f));
+    }
 }
 
 void APlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -245,13 +247,7 @@ void APlayerCharacter::OnMove(const FInputActionValue& Value)
     // Facing snap based on horizontal input
     if (FMath::Abs(MovementVector.X) > 0.1f)
     {
-        const bool bRight = MovementVector.X > 0.f;
-        if (bRight != bFacingRight)
-        {
-            bFacingRight = bRight;
-            const float TargetYaw = bFacingRight ? 0.f : 180.f;
-            SetActorRotation(FRotator(0.f, TargetYaw, 0.f));
-        }
+        SetFacing(MovementVector.X > 0.f);
     }
 }
 

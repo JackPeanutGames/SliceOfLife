@@ -9,6 +9,7 @@
 #include "DrawDebugHelpers.h"
 #include "Animation/AnimInstance.h"
 #include "Components/BoxComponent.h"
+#include "SliceOfLife/Characters/PlayerCharacter.h"
 #include "DrawDebugHelpers.h"
 
 UCombatComponent::UCombatComponent()
@@ -397,7 +398,9 @@ void UCombatComponent::OnHitboxBeginOverlap(UPrimitiveComponent* OverlappedComp,
     {
         InstigatorController = PawnOwner->GetController();
     }
-    UGameplayStatics::ApplyPointDamage(OtherActor, PendingHitboxDamage, OwnerActor->GetActorForwardVector(), SweepResult, InstigatorController, OwnerActor, nullptr);
+    // Use facing based on actor forward (player mesh flip rotates only mesh, so actor forward still +X; knockback direction remains gameplay-forward)
+    FVector FacingDir = OwnerActor->GetActorForwardVector();
+    UGameplayStatics::ApplyPointDamage(OtherActor, PendingHitboxDamage, FacingDir, SweepResult, InstigatorController, OwnerActor, nullptr);
 
     // Debug hit confirmation (global CVAR)
     static const auto CVarShowHitboxes = IConsoleManager::Get().FindConsoleVariable(TEXT("SliceOfLife.ShowHitboxes"));

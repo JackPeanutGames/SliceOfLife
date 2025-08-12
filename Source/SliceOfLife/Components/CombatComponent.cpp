@@ -350,12 +350,14 @@ void UCombatComponent::SpawnHitboxParams(const FVector& LocalOffset, const FVect
         // Ignore owner collisions
         Hitbox->IgnoreActorWhenMoving(OwnerActor, true);
 
-        // Debug draw
+        // Debug draw (attack hitbox)
         if (bEnableHitboxDebug)
         {
             const FTransform HitboxTransform(Hitbox->GetComponentRotation(), Hitbox->GetComponentLocation());
             DrawDebugBox(OwnerActor->GetWorld(), HitboxTransform.GetLocation(), BoxExtent, HitboxTransform.GetRotation(), FColor::Red, false, DebugHitboxDuration, 0, 2.0f);
         }
+
+        UE_LOG(LogTemp, Verbose, TEXT("Spawned hitbox at %s extent %s lifetime %.2fs"), *Hitbox->GetComponentLocation().ToString(), *BoxExtent.ToString(), DebugHitboxDuration);
 
         // Auto-destroy shortly after spawn to avoid lingering
         FTimerHandle DestroyHandle;
@@ -397,10 +399,17 @@ void UCombatComponent::OnHitboxBeginOverlap(UPrimitiveComponent* OverlappedComp,
     }
     UGameplayStatics::ApplyPointDamage(OtherActor, PendingHitboxDamage, OwnerActor->GetActorForwardVector(), SweepResult, InstigatorController, OwnerActor, nullptr);
 
-    // Debug hit confirmation
-    if (bEnableHitboxDebug)
+    // Debug hit confirmation (global CVAR)
+    static const auto CVarShowHitboxes = IConsoleManager::Get().FindConsoleVariable(TEXT("SliceOfLife.ShowHitboxes"));
+    const bool bShow = CVarShowHitboxes ? (CVarShowHitboxes->GetInt() != 0) : false;
+    if (bShow)
     {
-        DrawDebugPoint(OwnerActor->GetWorld(), SweepResult.ImpactPoint, 16.f, FColor::Yellow, false, 0.2f);
+        FVector Impact = OtherActor->GetActorLocation();
+        if (SweepResult.bBlockingHit)
+        {
+            Impact = FVector(SweepResult.ImpactPoint);
+        }
+        DrawDebugPoint(OwnerActor->GetWorld(), Impact, 16.f, FColor::Yellow, false, 0.2f);
     }
 
     // Destroy the hitbox component after hit

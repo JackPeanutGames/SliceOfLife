@@ -13,6 +13,7 @@
 #include "GameFramework/PlayerController.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "Kismet/GameplayStatics.h"
+#include "DrawDebugHelpers.h"
 
 APlayerCharacter::APlayerCharacter(const FObjectInitializer& ObjectInitializer)
     : Super(ObjectInitializer.SetDefaultSubobjectClass<UPlayerMovementComponent>(ACharacter::CharacterMovementComponentName))
@@ -108,6 +109,20 @@ void APlayerCharacter::Tick(float DeltaTime)
     UpdateCombatState();
 
     // Damage handling is now via UE damage system and animation notifies.
+
+    // Global hurt box debug draw
+    static const auto CVarShowHitboxes = IConsoleManager::Get().FindConsoleVariable(TEXT("SliceOfLife.ShowHitboxes"));
+    const bool bShow = CVarShowHitboxes ? (CVarShowHitboxes->GetInt() != 0) : false;
+    if (bShow)
+    {
+        if (UCapsuleComponent* Capsule = GetCapsuleComponent())
+        {
+            const FVector Location = Capsule->GetComponentLocation();
+            const float HalfHeight = Capsule->GetScaledCapsuleHalfHeight();
+            const float Radius = Capsule->GetScaledCapsuleRadius();
+            DrawDebugCapsule(GetWorld(), Location, HalfHeight, Radius, FQuat::Identity, FColor::Blue, false, 0.f, 0, 1.5f);
+        }
+    }
 }
 
 void APlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)

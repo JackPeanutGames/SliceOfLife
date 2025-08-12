@@ -1,4 +1,7 @@
 #include "SliceOfLife/Animation/SliceOfLifeAnimInstance.h"
+
+#include "KismetAnimationLibrary.h"
+#include "KismetAnimationLibrary.h"
 #include "SliceOfLife/Characters/PlayerCharacter.h"
 #include "SliceOfLife/Components/PlayerMovementComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -83,8 +86,8 @@ void USliceOfLifeAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
         bIsInHitstun = false;
     }
 
-    // Optional direction for blend spaces
-    MovementDirection = CalculateDirection(Velocity, OwnerPawn->GetActorRotation());
+    // Optional direction for blend spaces (use KismetAnimationLibrary per UE5 API)
+    MovementDirection = UKismetAnimationLibrary::CalculateDirection(Velocity, OwnerPawn->GetActorRotation());
 
     // Facing right based on velocity X sign (fallback). Designers can override in BP if mesh flip logic differs.
     bFacingRight = Velocity.X >= 0.f;

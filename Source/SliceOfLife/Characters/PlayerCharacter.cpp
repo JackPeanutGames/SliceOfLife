@@ -72,6 +72,13 @@ APlayerCharacter::APlayerCharacter(const FObjectInitializer& ObjectInitializer)
 
     // Default to 2.5D constraint at construction time
     ApplyPlaneConstraintSettings();
+
+    // We will rotate manually for 2.5D facing
+    if (UCharacterMovementComponent* Move = GetCharacterMovement())
+    {
+        Move->bOrientRotationToMovement = false;
+    }
+    bUseControllerRotationYaw = false;
 }
 
 void APlayerCharacter::BeginPlay()
@@ -123,6 +130,29 @@ void APlayerCharacter::Tick(float DeltaTime)
             DrawDebugCapsule(GetWorld(), Location, HalfHeight, Radius, FQuat::Identity, FColor::Blue, false, 0.f, 0, 1.5f);
         }
     }
+    // Safety: flip by velocity if input released but we are still moving horizontally
+    const FVector Vel = GetVelocity();
+    if (FMath::Abs(Vel.X) > 5.f)
+    {
+        const bool bRight = Vel.X > 0.f;
+        if (bRight != bFacingRight)
+        {
+            bFacingRight = bRight;
+            const float TargetYaw = bFacingRight ? 0.f : 180.f;
+            SetActorRotation(FRotator(0.f, TargetYaw, 0.f));
+        }
+    }
+}
+
+void APlayerCharacter::SetFacing(bool bRight)
+{
+    if (bFacingRight == bRight)
+    {
+        return;
+    }
+    bFacingRight = bRight;
+    const float TargetYaw = bFacingRight ? 0.f : 180.f;
+    SetActorRotation(FRotator(0.f, TargetYaw, 0.f));
 }
 
 void APlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -211,6 +241,18 @@ void APlayerCharacter::OnMove(const FInputActionValue& Value)
     }
     bIsMoving = !MovementVector.IsNearlyZero();
     bIsRunning = FMath::Abs(MovementVector.X) > 0.8f || FMath::Abs(MovementVector.Y) > 0.8f;
+
+    // Facing snap based on horizontal input
+    if (FMath::Abs(MovementVector.X) > 0.1f)
+    {
+        const bool bRight = MovementVector.X > 0.f;
+        if (bRight != bFacingRight)
+        {
+            bFacingRight = bRight;
+            const float TargetYaw = bFacingRight ? 0.f : 180.f;
+            SetActorRotation(FRotator(0.f, TargetYaw, 0.f));
+        }
+    }
 }
 
 void APlayerCharacter::OnJump(const FInputActionValue& Value)

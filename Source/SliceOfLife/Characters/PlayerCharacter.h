@@ -125,6 +125,13 @@ protected:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|PlaneConstraint")
     bool bConstrainToYPlane = true;
 
+    // Facing state for 2.5D
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Facing")
+    bool bFacingRight = true;
+
+    UFUNCTION(BlueprintCallable, Category = "Facing")
+    void SetFacing(bool bRight);
+
     // Designer-tunable movement settings applied to CharacterMovement
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Movement|Tuning")
     float DesignerMaxWalkSpeed = 600.0f;

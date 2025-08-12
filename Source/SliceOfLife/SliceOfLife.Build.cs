@@ -25,7 +25,7 @@ public class SliceOfLife : ModuleRules
 		PrivateDependencyModuleNames.AddRange(new string[] { 
 			"RenderCore",
 			"Renderer",
-			"RHI"
+			"RHI", "AnimGraphRuntime", "AnimGraphRuntime", "AnimGraphRuntime"
 		});
 
 		// Uncomment if you are using online features

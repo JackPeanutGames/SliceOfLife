@@ -13,6 +13,7 @@ USliceOfLifeAnimInstance::USliceOfLifeAnimInstance()
     , bIsInHitstun(false)
     , MovementDirection(0.f)
     , bIsDoubleJump(false)
+    , bFacingRight(true)
     , CachedPlayerCharacter(nullptr)
     , CachedMovementComponent(nullptr)
 {
@@ -84,6 +85,9 @@ void USliceOfLifeAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 
     // Optional direction for blend spaces
     MovementDirection = CalculateDirection(Velocity, OwnerPawn->GetActorRotation());
+
+    // Facing right based on velocity X sign (fallback). Designers can override in BP if mesh flip logic differs.
+    bFacingRight = Velocity.X >= 0.f;
 
     // Optional double-jump flag: leave as-is (to be set by character on second jump) unless you want to derive from movement component state
 }

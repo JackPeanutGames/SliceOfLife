@@ -18,6 +18,16 @@ enum class EAttackType : uint8
 };
 
 UENUM(BlueprintType)
+enum class EAttackDirection : uint8
+{
+    Up,
+    UpDiagonal,
+    Forward,
+    DownDiagonal,
+    Down
+};
+
+UENUM(BlueprintType)
 enum class EAttackState : uint8
 {
 	Idle,
@@ -174,6 +184,25 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Animation")
     float MontagePlayRate = 1.0f;
 
+    // Directional variants (optional). If not set, falls back to base montages above
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Animation|Directional")
+    class UAnimMontage* LightUpMontage;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Animation|Directional")
+    class UAnimMontage* LightForwardMontage;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Animation|Directional")
+    class UAnimMontage* LightDownMontage;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Animation|Directional")
+    class UAnimMontage* AerialUpMontage;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Animation|Directional")
+    class UAnimMontage* AerialForwardMontage;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Animation|Directional")
+    class UAnimMontage* AerialDownMontage;
+
 public:
     // Exposed helpers for animation notifies
     UFUNCTION(BlueprintCallable, Category = "Combat|Hitbox")
@@ -212,4 +241,30 @@ protected:
 	float CalculateStaleMultiplier(const FString& MoveName);
 	void UpdateMoveStaling(float DeltaTime);
 	FAttackData* GetAttackData(EAttackType AttackType, const FVector2D& Direction = FVector2D::ZeroVector);
+
+private:
+    // Directional selection
+    UPROPERTY(Transient)
+    EAttackDirection CurrentAttackDirection = EAttackDirection::Forward;
+
+    UFUNCTION()
+    void OnHitboxBeginOverlap(class UPrimitiveComponent* OverlappedComp, AActor* OtherActor, class UPrimitiveComponent* OtherComp,
+                               int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
+
+    // Temporary hitbox parameters for overlap callback
+    FVector PendingHitboxLocalOffset;
+    FVector PendingHitboxExtent;
+    float PendingHitboxDamage = 0.f;
+    float PendingHitboxKnockback = 0.f;
+
+    // One-hit-per-swing tracking
+    TSet<TWeakObjectPtr<AActor>> ActorsHitThisSwing;
+
+public:
+    // Debug drawing for hitboxes/hurtboxes
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Debug")
+    bool bEnableHitboxDebug = false;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Debug")
+    float DebugHitboxDuration = 0.2f;
 };

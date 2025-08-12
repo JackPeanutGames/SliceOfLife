@@ -1,0 +1,66 @@
+# --- IDE/OS noise ---
+.vs/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.VC.db
+*.VC.VC.opendb
+*.opensdf
+*.sdf
+.DS_Store
+Thumbs.db
+
+# --- Unreal generated (do not commit) ---
+Binaries/
+DerivedDataCache/
+Intermediate/
+Saved/
+DerivedDataCacheBoot/
+DerivedDataCache*/*.ddc
+
+# Live Coding / modules
+*.OpenUSD
+*.modules
+*.target
+*.rsp
+*.exp
+*.lib
+*.pdb
+
+# Unreal Build Tool intermediates (VS project files)
+# (These are regenerated; keep the .uproject and Source/Config only)
+.vscode/
+*.Code-workspace
+ProjectFiles/
+Intermediate/ProjectFiles/
+
+# Crash/Logs
+Saved/Logs/
+*.log
+*.dmp
+
+# Local builds / packaging output
+Build/Android/
+Build/IOS/
+Build/HoloLens/
+Build/Linux/
+Build/Mac/
+Build/Windows/
+Build/Win64/
+Build/Win32/
+
+# Automation/Derived
+*.DS_Store
+*.swp
+*.swo
+
+# Shader cache
+Saved/Collections/
+Saved/MaterialHLSL/
+Saved/ShaderDebug/
+
+# Config that’s machine-specific (leave default configs tracked)
+Config/DefaultEditor*.ini.sav
+Saved/Config/

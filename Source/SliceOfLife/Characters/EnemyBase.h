@@ -197,6 +197,9 @@ protected:
     UFUNCTION()
     void OnPerceptionUpdated(const TArray<AActor*>& UpdatedActors);
 
+    // Debug draw hurt box
+    void DebugDrawHurtCapsule();
+
     // Must be UFUNCTION for AddDynamic binding (matches FOnDamageReceived signature)
     UFUNCTION()
     void OnDamageReceived(float Damage, FVector KnockbackDirection, float KnockbackForce);

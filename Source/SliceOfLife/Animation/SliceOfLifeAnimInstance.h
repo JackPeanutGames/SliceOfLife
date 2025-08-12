@@ -50,6 +50,10 @@ protected:
     UPROPERTY(BlueprintReadOnly, Category = "Animation|Movement")
     bool bIsDoubleJump;
 
+    // Facing right helper for 2.5D flipping in AnimBP if desired
+    UPROPERTY(BlueprintReadOnly, Category = "Animation|Movement")
+    bool bFacingRight;
+
 private:
     // Cached owning character for quick access
     UPROPERTY(Transient)

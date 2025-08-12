@@ -146,6 +146,21 @@ void AEnemyBase::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 
 	UpdateAI(DeltaTime);
+
+    // Debug draw hurt box (capsule)
+    // Uses console variable: SliceOfLife.ShowHitboxes (0/1)
+    static const auto CVarShowHitboxes = IConsoleManager::Get().FindConsoleVariable(TEXT("SliceOfLife.ShowHitboxes"));
+    const bool bShow = CVarShowHitboxes ? (CVarShowHitboxes->GetInt() != 0) : false;
+    if (bShow)
+    {
+        if (UCapsuleComponent* Capsule = GetCapsuleComponent())
+        {
+            const FVector Location = Capsule->GetComponentLocation();
+            const float HalfHeight = Capsule->GetScaledCapsuleHalfHeight();
+            const float Radius = Capsule->GetScaledCapsuleRadius();
+            DrawDebugCapsule(GetWorld(), Location, HalfHeight, Radius, FQuat::Identity, FColor::Green, false, 0.f, 0, 1.5f);
+        }
+    }
 }
 
 float AEnemyBase::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)

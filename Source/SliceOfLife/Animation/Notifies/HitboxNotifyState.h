@@ -5,6 +5,7 @@
 #include "HitboxNotifyState.generated.h"
 
 class UCombatComponent;
+class UBoxComponent;
 
 UCLASS(DisplayName = "SOL_HitboxNotifyState")
 class SLICEOFLIFE_API USOL_HitboxNotifyState : public UAnimNotifyState
@@ -30,6 +31,10 @@ public:
 
     void NotifyBegin(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation, float TotalDuration, const FAnimNotifyEventReference& EventReference) override;
     void NotifyEnd(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation, const FAnimNotifyEventReference& EventReference) override;
+
+private:
+    UPROPERTY(Transient)
+    UBoxComponent* SpawnedHitbox = nullptr;
 };
 
 

@@ -171,15 +171,7 @@ void UCombatComponent::StartAttack(const FAttackData& AttackData)
 			*AttackData.AttackName, StaleMultiplier);
 	}
 	
-	// Spawn hitbox after a short delay
-	FTimerHandle HitboxTimerHandle;
-	GetWorld()->GetTimerManager().SetTimer(
-		HitboxTimerHandle,
-		this,
-		&UCombatComponent::SpawnHitbox,
-		AttackData.AttackDuration * 0.5f, // Spawn hitbox halfway through attack
-		false
-	);
+    // Notify-driven hitboxes handle overlap & damage; no timed fallback
 
     // Play montage if available
     if (ACharacter* OwnerChar = Cast<ACharacter>(GetOwner()))
@@ -287,69 +279,7 @@ void UCombatComponent::EndAttack()
 	UE_LOG(LogTemp, Log, TEXT("Attack ended"));
 }
 
-void UCombatComponent::SpawnHitbox()
-{
-    // Designers will add UAnimNotify(States) to montages to call ApplyDamage at correct frames.
-    // Fallback: simple forward probe for prototyping (object-type trace vs Pawns).
-    AActor* OwnerActor = GetOwner();
-    if (!OwnerActor) return;
-
-    // Compute a facing vector that mirrors left/right even if the actor yaw stays fixed.
-    // Default to actor forward (+X). If we can read a facing flag from the anim instance, prefer that.
-    FVector Facing = OwnerActor->GetActorForwardVector();
-
-    if (const ACharacter* Char = Cast<ACharacter>(OwnerActor))
-    {
-        // Try to read a "bFacingRight" style flag from your anim instance (optional).
-        if (const USkeletalMeshComponent* Mesh = Char->GetMesh())
-        {
-            if (const UAnimInstance* Anim = Mesh->GetAnimInstance())
-            {
-                // If you have a custom anim instance with bFacingRight, use it here:
-                // if (const USliceOfLifeAnimInstance* SOL = Cast<USliceOfLifeAnimInstance>(Anim))
-                // {
-                //     const int32 FacingSign = SOL->bFacingRight ? +1 : -1;
-                //     Facing = FVector(static_cast<float>(FacingSign), 0.f, 0.f);
-                // }
-            }
-        }
-    }
-
-    const FVector Start = OwnerActor->GetActorLocation();
-    const FVector End   = Start + Facing.GetSafeNormal() * 150.f;
-
-    // Object-type trace: hit Pawns regardless of their Visibility trace response.
-    FHitResult Hit;
-    FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(Attack), /*bTraceComplex*/ false, OwnerActor);
-    FCollisionObjectQueryParams ObjParams;
-    ObjParams.AddObjectTypesToQuery(ECC_Pawn);
-
-    const bool bHit = OwnerActor->GetWorld()->LineTraceSingleByObjectType(
-        Hit, Start, End, ObjParams, QueryParams);
-
-    // Visualize the probe so you can see success/fail instantly.
-    DrawDebugLine(OwnerActor->GetWorld(), Start, End, bHit ? FColor::Yellow : FColor::Red, false, 0.25f, 0, 2.f);
-
-    if (!bHit) return;
-
-    if (AActor* HitActor = Hit.GetActor())
-    {
-        const FVector Dir = (End - Start).GetSafeNormal();
-
-        UGameplayStatics::ApplyPointDamage(
-            HitActor,
-            CurrentAttack.Damage,          // make sure CurrentAttack is populated before calling SpawnHitbox()
-            Dir,
-            Hit,
-            OwnerActor->GetInstigatorController(),
-            OwnerActor,
-            /*DamageTypeClass*/ nullptr
-        );
-
-        // Yellow impact marker for instant confirmation.
-        DrawDebugPoint(OwnerActor->GetWorld(), Hit.ImpactPoint, 16.f, FColor::Yellow, false, 0.35f);
-    }
-}
+// SpawnHitbox() deleted; notify-driven UBoxComponent overlaps are the sole damage path now
 
 void UCombatComponent::DetectHits()
 {
@@ -358,78 +288,12 @@ void UCombatComponent::DetectHits()
 
 void UCombatComponent::SpawnHitboxParams(const FVector& LocalOffset, const FVector& BoxExtent, float Damage, float KnockbackForce)
 {
-    if (AActor* OwnerActor = GetOwner())
-    {
-        // Compute world center from local offset
-        // Use mesh transform so local offsets respect mesh-only yaw flips
-        USceneComponent* RefComp = nullptr;
-        if (ACharacter* OwnerCharC = Cast<ACharacter>(OwnerActor))
-        {
-            RefComp = OwnerCharC->GetMesh();
-        }
-        if (!RefComp)
-        {
-            RefComp = OwnerActor->GetRootComponent();
-        }
-        FVector Center = RefComp->GetComponentLocation() + RefComp->GetComponentTransform().TransformVector(LocalOffset);
-        // Nudge the spawn forward relative to gameplay-facing by ~150 units
-        FVector ForwardForSpawn = OwnerActor->GetActorForwardVector();
-        if (const APlayerCharacter* PlayerChar = Cast<APlayerCharacter>(OwnerActor))
-        {
-            ForwardForSpawn = PlayerChar->GetFacingVector();
-        }
-        Center += ForwardForSpawn * 150.f;
-
-        // Store parameters for overlap callback (single active hitbox recommended)
-        PendingHitboxLocalOffset = LocalOffset;
-        PendingHitboxExtent = BoxExtent;
-        PendingHitboxDamage = Damage;
-        PendingHitboxKnockback = KnockbackForce;
-
-        // Create a transient box component as the hitbox
-        UBoxComponent* Hitbox = NewObject<UBoxComponent>(OwnerActor);
-        if (!Hitbox)
-        {
-            return;
-        }
-        Hitbox->AttachToComponent(RefComp, FAttachmentTransformRules::KeepWorldTransform);
-        Hitbox->RegisterComponent();
-        Hitbox->SetBoxExtent(BoxExtent, true);
-        Hitbox->SetWorldLocation(Center);
-        Hitbox->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
-        Hitbox->SetCollisionObjectType(ECC_WorldDynamic);
-        Hitbox->SetGenerateOverlapEvents(true);
-        Hitbox->SetCollisionResponseToAllChannels(ECR_Ignore);
-        Hitbox->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
-        Hitbox->SetCollisionResponseToChannel(ECC_WorldDynamic, ECR_Ignore);
-
-        // Bind overlap to apply damage once, then destroy
-        Hitbox->OnComponentBeginOverlap.AddDynamic(this, &UCombatComponent::OnHitboxBeginOverlap);
-
-        // Ignore owner collisions
-        Hitbox->IgnoreActorWhenMoving(OwnerActor, true);
-
-        // Debug draw (attack hitbox)
-        if (bEnableHitboxDebug)
-        {
-            const FTransform HitboxTransform(Hitbox->GetComponentRotation(), Hitbox->GetComponentLocation());
-            DrawDebugBox(OwnerActor->GetWorld(), HitboxTransform.GetLocation(), BoxExtent, HitboxTransform.GetRotation(), FColor::Red, false, DebugHitboxDuration, 0, 2.0f);
-        }
-
-        UE_LOG(LogTemp, Verbose, TEXT("Spawned hitbox at %s extent %s lifetime %.2fs"), *Hitbox->GetComponentLocation().ToString(), *BoxExtent.ToString(), DebugHitboxDuration);
-
-        // Auto-destroy shortly after spawn to avoid lingering
-        FTimerHandle DestroyHandle;
-        OwnerActor->GetWorldTimerManager().SetTimer(DestroyHandle, [Hitbox]()
-        {
-            if (Hitbox)
-            {
-                Hitbox->DestroyComponent();
-            }
-        }, 0.2f, false);
-
-        UE_LOG(LogTemp, Verbose, TEXT("Spawned hitbox at %s extent %s dmg %.1f kb %.1f"), *Center.ToString(), *BoxExtent.ToString(), Damage, KnockbackForce);
-    }
+    // Legacy path not used now that notify-spawned hitboxes call overlap directly.
+    // Keep parameters for overlap callback to use damage values.
+    PendingHitboxLocalOffset = LocalOffset;
+    PendingHitboxExtent = BoxExtent;
+    PendingHitboxDamage = Damage;
+    PendingHitboxKnockback = KnockbackForce;
 }
 
 void UCombatComponent::OnHitboxBeginOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp,
@@ -487,6 +351,16 @@ void UCombatComponent::OnHitboxBeginOverlap(UPrimitiveComponent* OverlappedComp,
 void UCombatComponent::EndAttackNow()
 {
     EndAttack();
+}
+
+void UCombatComponent::BeginAttackWindow()
+{
+    ActorsHitThisSwing.Reset();
+}
+
+void UCombatComponent::EndAttackWindow()
+{
+    ActorsHitThisSwing.Reset();
 }
 
 float UCombatComponent::CalculateStaleMultiplier(const FString& MoveName)

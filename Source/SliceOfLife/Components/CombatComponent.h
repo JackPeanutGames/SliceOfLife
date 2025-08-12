@@ -211,6 +211,17 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Combat|State")
     void EndAttackNow();
 
+    // Notify-driven attack windows and overlap callback must be public for binding
+    UFUNCTION()
+    void OnHitboxBeginOverlap(class UPrimitiveComponent* OverlappedComp, AActor* OtherActor, class UPrimitiveComponent* OtherComp,
+                              int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
+
+    UFUNCTION(BlueprintCallable, Category = "Combat|State")
+    void BeginAttackWindow();
+
+    UFUNCTION(BlueprintCallable, Category = "Combat|State")
+    void EndAttackWindow();
+
 protected:
 	// Combat State
 	UPROPERTY(BlueprintReadOnly, Category = "Combat")
@@ -236,8 +247,7 @@ protected:
 	void StartAttack(const FAttackData& AttackData);
 	void UpdateAttack(float DeltaTime);
 	void EndAttack();
-    void SpawnHitbox();
-    void DetectHits();
+  void DetectHits();
 	float CalculateStaleMultiplier(const FString& MoveName);
 	void UpdateMoveStaling(float DeltaTime);
 	FAttackData* GetAttackData(EAttackType AttackType, const FVector2D& Direction = FVector2D::ZeroVector);
@@ -247,10 +257,6 @@ private:
     UPROPERTY(Transient)
     EAttackDirection CurrentAttackDirection = EAttackDirection::Forward;
 
-    UFUNCTION()
-    void OnHitboxBeginOverlap(class UPrimitiveComponent* OverlappedComp, AActor* OtherActor, class UPrimitiveComponent* OtherComp,
-                               int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
-
     // Temporary hitbox parameters for overlap callback
     FVector PendingHitboxLocalOffset;
     FVector PendingHitboxExtent;
@@ -259,6 +265,7 @@ private:
 
     // One-hit-per-swing tracking
     TSet<TWeakObjectPtr<AActor>> ActorsHitThisSwing;
+
 
 public:
     // Debug drawing for hitboxes/hurtboxes

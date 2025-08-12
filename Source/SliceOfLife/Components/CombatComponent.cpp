@@ -290,20 +290,64 @@ void UCombatComponent::EndAttack()
 void UCombatComponent::SpawnHitbox()
 {
     // Designers will add UAnimNotify(States) to montages to call ApplyDamage at correct frames.
-    // Fallback: simple point damage at owner forward hitbox for prototyping.
-    if (AActor* OwnerActor = GetOwner())
+    // Fallback: simple forward probe for prototyping (object-type trace vs Pawns).
+    AActor* OwnerActor = GetOwner();
+    if (!OwnerActor) return;
+
+    // Compute a facing vector that mirrors left/right even if the actor yaw stays fixed.
+    // Default to actor forward (+X). If we can read a facing flag from the anim instance, prefer that.
+    FVector Facing = OwnerActor->GetActorForwardVector();
+
+    if (const ACharacter* Char = Cast<ACharacter>(OwnerActor))
     {
-        const FVector Start = OwnerActor->GetActorLocation();
-        const FVector End = Start + OwnerActor->GetActorForwardVector() * 150.f;
-        FHitResult Hit;
-        FCollisionQueryParams Params(SCENE_QUERY_STAT(Attack), false, OwnerActor);
-        if (OwnerActor->GetWorld()->LineTraceSingleByChannel(Hit, Start, End, ECC_Visibility, Params))
+        // Try to read a "bFacingRight" style flag from your anim instance (optional).
+        if (const USkeletalMeshComponent* Mesh = Char->GetMesh())
         {
-            if (AActor* HitActor = Hit.GetActor())
+            if (const UAnimInstance* Anim = Mesh->GetAnimInstance())
             {
-                UGameplayStatics::ApplyPointDamage(HitActor, CurrentAttack.Damage, OwnerActor->GetActorForwardVector(), Hit, nullptr, OwnerActor, nullptr);
+                // If you have a custom anim instance with bFacingRight, use it here:
+                // if (const USliceOfLifeAnimInstance* SOL = Cast<USliceOfLifeAnimInstance>(Anim))
+                // {
+                //     const int32 FacingSign = SOL->bFacingRight ? +1 : -1;
+                //     Facing = FVector(static_cast<float>(FacingSign), 0.f, 0.f);
+                // }
             }
         }
+    }
+
+    const FVector Start = OwnerActor->GetActorLocation();
+    const FVector End   = Start + Facing.GetSafeNormal() * 150.f;
+
+    // Object-type trace: hit Pawns regardless of their Visibility trace response.
+    FHitResult Hit;
+    FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(Attack), /*bTraceComplex*/ false, OwnerActor);
+    FCollisionObjectQueryParams ObjParams;
+    ObjParams.AddObjectTypesToQuery(ECC_Pawn);
+
+    const bool bHit = OwnerActor->GetWorld()->LineTraceSingleByObjectType(
+        Hit, Start, End, ObjParams, QueryParams);
+
+    // Visualize the probe so you can see success/fail instantly.
+    DrawDebugLine(OwnerActor->GetWorld(), Start, End, bHit ? FColor::Yellow : FColor::Red, false, 0.25f, 0, 2.f);
+
+    if (!bHit) return;
+
+    if (AActor* HitActor = Hit.GetActor())
+    {
+        const FVector Dir = (End - Start).GetSafeNormal();
+
+        UGameplayStatics::ApplyPointDamage(
+            HitActor,
+            CurrentAttack.Damage,          // make sure CurrentAttack is populated before calling SpawnHitbox()
+            Dir,
+            Hit,
+            OwnerActor->GetInstigatorController(),
+            OwnerActor,
+            /*DamageTypeClass*/ nullptr
+        );
+
+        // Yellow impact marker for instant confirmation.
+        DrawDebugPoint(OwnerActor->GetWorld(), Hit.ImpactPoint, 16.f, FColor::Yellow, false, 0.35f);
     }
 }
 
@@ -427,6 +471,10 @@ void UCombatComponent::OnHitboxBeginOverlap(UPrimitiveComponent* OverlappedComp,
             Impact = FVector(SweepResult.ImpactPoint);
         }
         DrawDebugPoint(OwnerActor->GetWorld(), Impact, 16.f, FColor::Yellow, false, 0.2f);
+        if (HitImpactFX)
+        {
+            UGameplayStatics::SpawnEmitterAtLocation(OwnerActor->GetWorld(), HitImpactFX, Impact);
+        }
     }
 
     // Destroy the hitbox component after hit

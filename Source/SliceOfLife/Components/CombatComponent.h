@@ -267,4 +267,8 @@ public:
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Debug")
     float DebugHitboxDuration = 0.2f;
+
+    // Optional hit impact FX (Cascade). If set, will be spawned at impact point on overlap
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|VFX")
+    class UParticleSystem* HitImpactFX;
 };

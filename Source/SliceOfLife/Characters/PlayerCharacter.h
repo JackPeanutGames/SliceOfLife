@@ -166,6 +166,10 @@ protected:
     EAttackState PreviousAttackState;
     bool bHasHitThisSwing;
 
+    // Input lock flag (driven by anim notifies or montage events)
+    UPROPERTY(BlueprintReadOnly, Category = "Input")
+    bool bIsInputLocked = false;
+
 	// Health State
 	UPROPERTY(BlueprintReadOnly, Category = "Health")
 	bool bIsInHitstun;
@@ -208,6 +212,10 @@ public:
 
     UFUNCTION(BlueprintCallable, Category = "Facing")
     int32 GetFacingSign() const { return bFacingRight ? 1 : -1; }
+
+    // Input locking during attack montages
+    UFUNCTION(BlueprintCallable, Category = "Input")
+    void SetInputLocked(bool bLocked) { bIsInputLocked = bLocked; }
 
 	UFUNCTION(BlueprintPure, Category = "Health")
 	bool IsInHitstun() const { return bIsInHitstun; }

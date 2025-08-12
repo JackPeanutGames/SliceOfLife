@@ -25,29 +25,7 @@ AEnemyBase::AEnemyBase()
 	HealthComponent = CreateDefaultSubobject<UHealthComponent>(TEXT("HealthComponent"));
     AIPerceptionComponent = CreateDefaultSubobject<UAIPerceptionComponent>(TEXT("AIPerception"));
     SightConfig = CreateDefaultSubobject<UAISenseConfig_Sight>(TEXT("SightConfig"));
-
-    // Visual placeholders
-    PlaceholderBody = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("PlaceholderBody"));
-    PlaceholderHead = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("PlaceholderHead"));
-    PlaceholderBody->SetupAttachment(RootComponent);
-    PlaceholderHead->SetupAttachment(PlaceholderBody);
-
-    static ConstructorHelpers::FObjectFinder<UStaticMesh> SphereFinder(TEXT("/Engine/BasicShapes/Sphere.Sphere"));
-    if (SphereFinder.Succeeded())
-    {
-        PlaceholderBody->SetStaticMesh(SphereFinder.Object);
-        PlaceholderHead->SetStaticMesh(SphereFinder.Object);
-        // 2m tall: main body sphere of 150cm diameter with a 50cm head above to total ~200cm visible
-        PlaceholderBody->SetWorldScale3D(FVector(1.5f));   // 150cm diameter
-        PlaceholderBody->SetRelativeLocation(FVector(0, 0, 75.0f));
-        PlaceholderHead->SetWorldScale3D(FVector(0.5f));   // 50cm diameter
-        // Place head so top reaches 200cm: body center 75 + head center offset 100 = 175; 175 + 25 radius = 200 top
-        PlaceholderHead->SetRelativeLocation(FVector(0, 0, 100.0f));
-        PlaceholderBody->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-        PlaceholderHead->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-        PlaceholderBody->SetGenerateOverlapEvents(false);
-        PlaceholderHead->SetGenerateOverlapEvents(false);
-    }
+	
 
     // Capsule to roughly match 2m height
     if (UCapsuleComponent* Capsule = GetCapsuleComponent())

@@ -32,20 +32,6 @@ APlayerCharacter::APlayerCharacter(const FObjectInitializer& ObjectInitializer)
         Capsule->InitCapsuleSize(50.0f, 50.0f); // radius, half-height (units in cm)
     }
 
-    // Placeholder body mesh
-    PlaceholderBody = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("PlaceholderBody"));
-    PlaceholderBody->SetupAttachment(RootComponent);
-    static ConstructorHelpers::FObjectFinder<UStaticMesh> SphereFinder(TEXT("/Engine/BasicShapes/Sphere.Sphere"));
-    if (SphereFinder.Succeeded())
-    {
-        PlaceholderBody->SetStaticMesh(SphereFinder.Object);
-        // Scale so diameter is 100cm (1m). Engine sphere default radius is 50cm with scale 1.0, so 1.0 is already 1m diameter.
-        PlaceholderBody->SetWorldScale3D(FVector(1.0f));
-        PlaceholderBody->SetRelativeLocation(FVector(0.0, 0.0, 50.0f)); // Sit on ground
-        PlaceholderBody->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-        PlaceholderBody->SetGenerateOverlapEvents(false);
-    }
-
     // Setup camera boom
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(RootComponent);
@@ -251,7 +237,7 @@ void APlayerCharacter::OnMove(const FInputActionValue& Value)
 {
     const FVector2D MovementVector = Value.Get<FVector2D>();
     // Side-scroller: drive world-X; ignore world-Y (plane constrained); optional: Y maps to vertical (Z)
-    if (!MovementVector.IsNearlyZero())
+    if (!MovementVector.IsNearlyZero() && !bIsInputLocked)
     {
         AddMovementInput(FVector(1.f, 0.f, 0.f), MovementVector.X);
         // If vertical input needed: AddMovementInput(FVector(0.f, 0.f, 1.f), MovementVector.Y);

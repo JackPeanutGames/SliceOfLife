@@ -9,8 +9,11 @@
 #include "DrawDebugHelpers.h"
 #include "Animation/AnimInstance.h"
 #include "Components/BoxComponent.h"
+#include "Components/CapsuleComponent.h"
 #include "SliceOfLife/Characters/PlayerCharacter.h"
 #include "DrawDebugHelpers.h"
+#include "Engine/DamageEvents.h"
+#include "HAL/IConsoleManager.h"
 
 UCombatComponent::UCombatComponent()
 {
@@ -29,6 +32,11 @@ UCombatComponent::UCombatComponent()
 void UCombatComponent::BeginPlay()
 {
 	Super::BeginPlay();
+
+	if (IConsoleVariable* CVar = IConsoleManager::Get().FindConsoleVariable(TEXT("SliceOfLife.ShowOffensiveHitboxes")))
+	{
+		bShowOffensiveHitboxes = (CVar->GetInt() != 0);
+	}
 }
 
 void UCombatComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
@@ -314,15 +322,44 @@ void UCombatComponent::OnHitboxBeginOverlap(UPrimitiveComponent* OverlappedComp,
     }
     ActorsHitThisSwing.Add(OtherActor);
 
-    // Apply damage to the other actor
+    // Determine instigator controller for damage
     AController* InstigatorController = nullptr;
     if (APawn* PawnOwner = Cast<APawn>(OwnerActor))
     {
         InstigatorController = PawnOwner->GetController();
     }
-    // Use facing based on actor forward (player mesh flip rotates only mesh, so actor forward still +X; knockback direction remains gameplay-forward)
-    FVector FacingDir = OwnerActor->GetActorForwardVector();
-    UGameplayStatics::ApplyPointDamage(OtherActor, PendingHitboxDamage, FacingDir, SweepResult, InstigatorController, OwnerActor, nullptr);
+    // Apply damage using PendingHitboxDamage
+    FPointDamageEvent PointEvent;
+    OtherActor->TakeDamage(PendingHitboxDamage, PointEvent, InstigatorController, OwnerActor);
+    // Apply knockback using PendingHitboxKnockback
+    if (UHealthComponent* OtherHealth = OtherActor->FindComponentByClass<UHealthComponent>())
+    {
+        FVector FacingDir = OwnerActor->GetActorForwardVector();
+        OtherHealth->ApplyKnockback(FacingDir, PendingHitboxKnockback);
+    }
+    // Reset pending values
+    PendingHitboxDamage = 0.f;
+    PendingHitboxKnockback = 0.f;
+
+    // Briefly tint enemy capsule red on hit for feedback
+    if (UCapsuleComponent* Capsule = OtherActor->FindComponentByClass<UCapsuleComponent>())
+    {
+        FColor OriginalColor = Capsule->ShapeColor;
+        Capsule->ShapeColor = FColor::Red;
+
+        FTimerHandle RevertTimer;
+        Capsule->GetWorld()->GetTimerManager().SetTimer(
+            RevertTimer,
+            [Capsule, OriginalColor]()
+            {
+                if (::IsValid(Capsule))
+                {
+                    Capsule->ShapeColor = OriginalColor;
+                }
+            },
+            0.2f,
+            false);
+    }
 
     // Debug hit confirmation (global CVAR)
     static const auto CVarShowHitboxes = IConsoleManager::Get().FindConsoleVariable(TEXT("SliceOfLife.ShowHitboxes"));

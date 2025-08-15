@@ -18,12 +18,16 @@ void USOL_HitboxNotifyState::NotifyBegin(USkeletalMeshComponent* MeshComp, UAnim
         if (UCombatComponent* Combat = Owner->FindComponentByClass<UCombatComponent>())
         {
             Combat->BeginAttackWindow();
+            Combat->SpawnHitboxParams(LocalOffset, BoxExtent, Damage, KnockbackForce);
             // Spawn a box hitbox attached to mesh so it mirrors flip automatically
             SpawnedHitbox = NewObject<UBoxComponent>(Owner);
             if (SpawnedHitbox)
             {
                 SpawnedHitbox->AttachToComponent(MeshComp, FAttachmentTransformRules::KeepRelativeTransform);
                 SpawnedHitbox->RegisterComponent();
+                // Make the hitbox visible and bright red for debug visibility
+                SpawnedHitbox->ShapeColor = FColor::Red;
+                SpawnedHitbox->SetHiddenInGame(false);
                 SpawnedHitbox->SetBoxExtent(BoxExtent, true);
                 // Position from local offset (relative to mesh)
                 const FVector RelLoc = LocalOffset;

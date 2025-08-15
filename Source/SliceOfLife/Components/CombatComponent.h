@@ -278,4 +278,8 @@ public:
     // Optional hit impact FX (Cascade). If set, will be spawned at impact point on overlap
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|VFX")
     class UParticleSystem* HitImpactFX;
+
+    /** When true, spawned attack hitboxes will be visible in game. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Debug)
+    bool bShowOffensiveHitboxes = false;
 };

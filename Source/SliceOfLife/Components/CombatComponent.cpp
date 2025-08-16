@@ -308,7 +308,7 @@ void UCombatComponent::OnHitboxBeginOverlap(UPrimitiveComponent* OverlappedComp,
                                            int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
     AActor* OwnerActor = GetOwner();
-    if (!OwnerActor || !OtherActor || OtherActor == OwnerActor)
+  if (!OwnerActor || !OtherActor || OtherActor == OwnerActor)
     {
         return;
     }
@@ -328,19 +328,17 @@ void UCombatComponent::OnHitboxBeginOverlap(UPrimitiveComponent* OverlappedComp,
     {
         InstigatorController = PawnOwner->GetController();
     }
+    // Determine knockback direction based on the owner's facing direction
+    FVector FacingDir = OwnerActor->GetActorForwardVector();
     // Apply damage using PendingHitboxDamage
     FPointDamageEvent PointEvent;
     OtherActor->TakeDamage(PendingHitboxDamage, PointEvent, InstigatorController, OwnerActor);
-    // Apply knockback using PendingHitboxKnockback
-    if (UHealthComponent* OtherHealth = OtherActor->FindComponentByClass<UHealthComponent>())
+    // Immediately launch the enemy if it's a character
+    if (ACharacter* EnemyChar = Cast<ACharacter>(OtherActor))
     {
-        FVector FacingDir = OwnerActor->GetActorForwardVector();
-        OtherHealth->ApplyKnockback(FacingDir, PendingHitboxKnockback);
+        FVector LaunchVelocity = FacingDir * PendingHitboxKnockback;
+        EnemyChar->LaunchCharacter(LaunchVelocity, true, true);
     }
-    // Reset pending values
-    PendingHitboxDamage = 0.f;
-    PendingHitboxKnockback = 0.f;
-
     // Briefly tint enemy capsule red on hit for feedback
     if (UCapsuleComponent* Capsule = OtherActor->FindComponentByClass<UCapsuleComponent>())
     {
@@ -360,6 +358,10 @@ void UCombatComponent::OnHitboxBeginOverlap(UPrimitiveComponent* OverlappedComp,
             0.2f,
             false);
     }
+
+    // Reset pending values
+    PendingHitboxDamage = 0.f;
+    PendingHitboxKnockback = 0.f;
 
     // Debug hit confirmation (global CVAR)
     static const auto CVarShowHitboxes = IConsoleManager::Get().FindConsoleVariable(TEXT("SliceOfLife.ShowHitboxes"));

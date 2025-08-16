@@ -16,6 +16,8 @@
 #include "Components/CapsuleComponent.h"
 #include "SliceOfLife/AI/EnemyAIController.h"
 #include "UObject/ConstructorHelpers.h"
+#include "HAL/IConsoleManager.h"
+#include "DrawDebugHelpers.h"
 
 AEnemyBase::AEnemyBase()
 {
@@ -424,5 +426,16 @@ float AEnemyBase::GetMovementSpeed() const
 		return EnemyStats.ChaseSpeed;
 	default:
 		return EnemyStats.PatrolSpeed;
+	}
+}
+
+void AEnemyBase::ReactToHit()
+{
+	if (HealthComponent && HealthComponent->IsAlive())
+	{
+		if (CurrentState != EEnemyState::Stunned)
+		{
+			StunEnemy(EnemyStats.StunDuration);
+		}
 	}
 }

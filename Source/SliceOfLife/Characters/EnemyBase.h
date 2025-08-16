@@ -103,6 +103,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Enemy Combat")
 	bool CanAttack() const;
 
+	UFUNCTION(BlueprintCallable, Category = "Combat")
+	void ReactToHit();
+
     // AI Controller & BT
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Enemy AI")
     TSubclassOf<class AAIController> AIControllerClassOverride;
@@ -206,4 +209,6 @@ protected:
 
 	// Movement speed helper
 	float GetMovementSpeed() const;
+
+	FTimerHandle HitReactTimerHandle;
 };

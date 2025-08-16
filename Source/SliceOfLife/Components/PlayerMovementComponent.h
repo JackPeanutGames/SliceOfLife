@@ -144,4 +144,7 @@ protected:
     void HandleJump();
     void HandleDash(float DeltaTime);
     void HandleCrouch();
+
+    // Reset jump state when landing
+    virtual void OnMovementModeChanged(EMovementMode PreviousMovementMode, uint8 PreviousCustomMode = 0) override;
 };

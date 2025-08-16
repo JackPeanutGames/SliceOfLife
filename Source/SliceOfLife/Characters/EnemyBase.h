@@ -11,6 +11,8 @@ class UBlackboardData;
 class UAIPerceptionComponent;
 class UAISenseConfig_Sight;
 class UStaticMeshComponent;
+class USphereComponent;
+class UCapsuleComponent;
 
 UENUM(BlueprintType)
 enum class EEnemyState : uint8
@@ -151,6 +153,33 @@ protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Visuals")
     UStaticMeshComponent* PlaceholderHead;
 
+    // Body part colliders for hit detection
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Hitboxes")
+    USphereComponent* HeadCollider;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Hitboxes")
+    UCapsuleComponent* TorsoCollider;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Hitboxes")
+    UCapsuleComponent* LegCollider;
+
+    // Weapon visual attached to socket (e.g., Skewer)
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
+    FName WeaponSocketName = TEXT("SkewerSocket");
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
+    UStaticMesh* WeaponMesh;
+
+    UPROPERTY()
+    UStaticMeshComponent* WeaponMeshComponent;
+
+    // Item drops
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Drops")
+    class UDataTable* ItemDropTable;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Drops")
+    int32 HitsRemaining = 2;
+
 	// AI Behavior Tree
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Enemy AI")
 	UBehaviorTree* BehaviorTree;
@@ -202,6 +231,7 @@ protected:
 
     // Debug draw hurt box
     void DebugDrawHurtCapsule();
+    void DebugDrawBodyColliders();
 
     // Must be UFUNCTION for AddDynamic binding (matches FOnDamageReceived signature)
     UFUNCTION()
@@ -211,4 +241,14 @@ protected:
 	float GetMovementSpeed() const;
 
 	FTimerHandle HitReactTimerHandle;
+
+    // Debug hit timestamps for red flash
+    float LastHeadHitTime = -1000.f;
+    float LastTorsoHitTime = -1000.f;
+    float LastLegHitTime = -1000.f;
+
+protected:
+    UFUNCTION()
+    void OnBodyPartOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp,
+        int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
 };

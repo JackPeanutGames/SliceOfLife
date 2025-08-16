@@ -12,6 +12,7 @@ class UHealthComponent;
 class UInputMappingContext;
 class UInputAction;
 class UStaticMeshComponent;
+class AWeaponBase;
 
 UCLASS(Blueprintable)
 class SLICEOFLIFE_API APlayerCharacter : public ACharacter
@@ -181,6 +182,13 @@ protected:
 	void UpdateCombatState();
     void AddDefaultMappingContext();
     void ApplyPlaneConstraintSettings();
+
+    // Weapons
+    UPROPERTY(EditDefaultsOnly, Category = "Weapon")
+    TSubclassOf<AWeaponBase> SkewerClass;
+
+    UPROPERTY(VisibleAnywhere, Category = "Weapon")
+    AWeaponBase* CurrentWeapon;
 
 public:
 	// Component Getters

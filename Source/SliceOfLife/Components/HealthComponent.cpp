@@ -53,12 +53,13 @@ void UHealthComponent::TakeDamage(float Damage, FVector KnockbackDirection, floa
 	// Calculate knockback force
 	float FinalKnockbackForce = CalculateKnockbackForce(KnockbackForce, CurrentDamagePercent);
 	
-	// Apply knockback
+	// Apply knockback and immediate hitstun effects in the same frame to avoid perceived delay
 	ApplyKnockback(KnockbackDirection, FinalKnockbackForce);
-	
-	// Set hitstun
+	ApplyHitstunEffects();
 	float HitstunDuration = DamageSettings.HitstunDuration * WeightSettings.HitstunMultiplier;
-	SetHitstun(HitstunDuration);
+	bInHitstun = true;
+	HitstunTimer = HitstunDuration;
+	OnHitstunChanged.Broadcast(true);
 	
 	// Broadcast events
 	OnDamageReceived.Broadcast(ActualDamage, KnockbackDirection, FinalKnockbackForce);
@@ -126,8 +127,17 @@ void UHealthComponent::ApplyKnockback(FVector Direction, float Force)
         FVector LaunchVel = Direction.GetSafeNormal() * Force;
         LaunchVel /= FMath::Max(WeightSettings.BaseKnockbackResistance, 0.01f);
         CurrentKnockbackVelocity = LaunchVel;
-        OwnerCharacter->LaunchCharacter(LaunchVel, true, true);
-        UE_LOG(LogTemp, Log, TEXT("Applied knockback via LaunchCharacter: Dir=%s Force=%f Vel=%s"), *Direction.ToString(), Force, *LaunchVel.ToString());
+        if (UCharacterMovementComponent* MovementComp = OwnerCharacter->GetCharacterMovement())
+        {
+            // Disable and set velocity now for immediate, snappy response
+            MovementComp->DisableMovement();
+            MovementComp->Velocity = LaunchVel;
+        }
+        else
+        {
+            OwnerCharacter->LaunchCharacter(LaunchVel, true, true);
+        }
+        UE_LOG(LogTemp, Log, TEXT("Applied immediate knockback: Dir=%s Force=%f Vel=%s"), *Direction.ToString(), Force, *LaunchVel.ToString());
     }
 }
 

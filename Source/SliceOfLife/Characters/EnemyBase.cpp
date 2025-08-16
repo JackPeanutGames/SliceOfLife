@@ -18,6 +18,11 @@
 #include "UObject/ConstructorHelpers.h"
 #include "HAL/IConsoleManager.h"
 #include "DrawDebugHelpers.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "Components/SphereComponent.h"
+#include "Engine/DataTable.h"
+#include "SliceOfLife/Items/ItemDropTypes.h"
+#include "SliceOfLife/Items/ItemActor.h"
 
 AEnemyBase::AEnemyBase()
 {
@@ -34,6 +39,45 @@ AEnemyBase::AEnemyBase()
     {
         Capsule->InitCapsuleSize(40.0f, 100.0f); // radius, half-height
     }
+
+    // Body part hit colliders
+    HeadCollider = CreateDefaultSubobject<USphereComponent>(TEXT("HeadCollider"));
+    TorsoCollider = CreateDefaultSubobject<UCapsuleComponent>(TEXT("TorsoCollider"));
+    LegCollider = CreateDefaultSubobject<UCapsuleComponent>(TEXT("LegCollider"));
+
+    if (GetMesh())
+    {
+        HeadCollider->SetupAttachment(GetMesh());
+        TorsoCollider->SetupAttachment(GetMesh());
+        LegCollider->SetupAttachment(GetMesh());
+    }
+    // Approximate placements relative to mesh origin
+    HeadCollider->SetSphereRadius(20.f);
+    HeadCollider->SetRelativeLocation(FVector(0.f, 0.f, 90.f));
+
+    TorsoCollider->InitCapsuleSize(35.f, 50.f);
+    TorsoCollider->SetRelativeLocation(FVector(0.f, 0.f, 50.f));
+
+    LegCollider->InitCapsuleSize(30.f, 40.f);
+    LegCollider->SetRelativeLocation(FVector(0.f, 0.f, 10.f));
+
+    // Set overlap collision for body parts (overlap with weapon hitboxes)
+    auto ConfigureOverlap = [](UPrimitiveComponent* Comp)
+    {
+        if (!Comp) return;
+        Comp->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+        Comp->SetCollisionObjectType(ECC_WorldDynamic);
+        Comp->SetCollisionResponseToAllChannels(ECR_Ignore);
+        Comp->SetCollisionResponseToChannel(ECC_WorldDynamic, ECR_Overlap);
+        Comp->SetGenerateOverlapEvents(true);
+    };
+    ConfigureOverlap(HeadCollider);
+    ConfigureOverlap(TorsoCollider);
+    ConfigureOverlap(LegCollider);
+
+    HeadCollider->OnComponentBeginOverlap.AddDynamic(this, &AEnemyBase::OnBodyPartOverlap);
+    TorsoCollider->OnComponentBeginOverlap.AddDynamic(this, &AEnemyBase::OnBodyPartOverlap);
+    LegCollider->OnComponentBeginOverlap.AddDynamic(this, &AEnemyBase::OnBodyPartOverlap);
 
     // Configure AI Perception (Sight)
     if (SightConfig)
@@ -119,6 +163,19 @@ void AEnemyBase::BeginPlay()
             AI->RunBehaviorTree(const_cast<UBehaviorTree*>(GetBehaviorTree()));
         }
     }
+
+    // Attach weapon mesh if provided
+    if (GetMesh() && WeaponMesh)
+    {
+        WeaponMeshComponent = NewObject<UStaticMeshComponent>(this, TEXT("WeaponMeshComponent"));
+        if (WeaponMeshComponent)
+        {
+            WeaponMeshComponent->SetStaticMesh(WeaponMesh);
+            WeaponMeshComponent->SetupAttachment(GetMesh(), WeaponSocketName);
+            WeaponMeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+            WeaponMeshComponent->RegisterComponent();
+        }
+    }
 }
 
 void AEnemyBase::Tick(float DeltaTime)
@@ -127,19 +184,53 @@ void AEnemyBase::Tick(float DeltaTime)
 
 	UpdateAI(DeltaTime);
 
-    // Debug draw hurt box (capsule)
-    // Uses console variable: SliceOfLife.ShowHitboxes (0/1)
+    // Debug draw hurt box (capsule) and body colliders
     static const auto CVarShowHitboxes = IConsoleManager::Get().FindConsoleVariable(TEXT("SliceOfLife.ShowHitboxes"));
     const bool bShow = CVarShowHitboxes ? (CVarShowHitboxes->GetInt() != 0) : false;
     if (bShow)
     {
-        if (UCapsuleComponent* Capsule = GetCapsuleComponent())
-        {
-            const FVector Location = Capsule->GetComponentLocation();
-            const float HalfHeight = Capsule->GetScaledCapsuleHalfHeight();
-            const float Radius = Capsule->GetScaledCapsuleRadius();
-            DrawDebugCapsule(GetWorld(), Location, HalfHeight, Radius, FQuat::Identity, FColor::Green, false, 0.f, 0, 1.5f);
-        }
+        DebugDrawHurtCapsule();
+        DebugDrawBodyColliders();
+    }
+}
+
+void AEnemyBase::DebugDrawHurtCapsule()
+{
+    if (UCapsuleComponent* Capsule = GetCapsuleComponent())
+    {
+        const FVector Location = Capsule->GetComponentLocation();
+        const float HalfHeight = Capsule->GetScaledCapsuleHalfHeight();
+        const float Radius = Capsule->GetScaledCapsuleRadius();
+        DrawDebugCapsule(GetWorld(), Location, HalfHeight, Radius, FQuat::Identity, FColor::Green, false, 0.f, 0, 1.5f);
+    }
+}
+
+void AEnemyBase::DebugDrawBodyColliders()
+{
+    const float Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
+    const float FlashDuration = 0.2f;
+
+    if (HeadCollider)
+    {
+        const bool bFlash = (Now - LastHeadHitTime) < FlashDuration;
+        const FColor Color = bFlash ? FColor::Red : FColor::Green;
+        DrawDebugSphere(GetWorld(), HeadCollider->GetComponentLocation(), HeadCollider->GetScaledSphereRadius(), 12, Color, false, 0.f, 0, 1.5f);
+    }
+    if (TorsoCollider)
+    {
+        const bool bFlash = (Now - LastTorsoHitTime) < FlashDuration;
+        const FColor Color = bFlash ? FColor::Red : FColor::Green;
+        const float HalfHeight = Cast<UCapsuleComponent>(TorsoCollider)->GetScaledCapsuleHalfHeight();
+        const float Radius = Cast<UCapsuleComponent>(TorsoCollider)->GetScaledCapsuleRadius();
+        DrawDebugCapsule(GetWorld(), TorsoCollider->GetComponentLocation(), HalfHeight, Radius, FQuat::Identity, Color, false, 0.f, 0, 1.5f);
+    }
+    if (LegCollider)
+    {
+        const bool bFlash = (Now - LastLegHitTime) < FlashDuration;
+        const FColor Color = bFlash ? FColor::Red : FColor::Green;
+        const float HalfHeight = Cast<UCapsuleComponent>(LegCollider)->GetScaledCapsuleHalfHeight();
+        const float Radius = Cast<UCapsuleComponent>(LegCollider)->GetScaledCapsuleRadius();
+        DrawDebugCapsule(GetWorld(), LegCollider->GetComponentLocation(), HalfHeight, Radius, FQuat::Identity, Color, false, 0.f, 0, 1.5f);
     }
 }
 
@@ -438,4 +529,87 @@ void AEnemyBase::ReactToHit()
 			StunEnemy(EnemyStats.StunDuration);
 		}
 	}
+}
+
+void AEnemyBase::OnBodyPartOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp,
+    int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+{
+    // Record hit time for flash
+    const float Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
+    if (OverlappedComp == HeadCollider) LastHeadHitTime = Now;
+    else if (OverlappedComp == TorsoCollider) LastTorsoHitTime = Now;
+    else if (OverlappedComp == LegCollider) LastLegHitTime = Now;
+
+    // Basic guard
+    if (!OtherActor || OtherActor == this) return;
+
+    // Determine body part
+    EBodyPart BodyPart = EBodyPart::Torso;
+    if (OverlappedComp == HeadCollider) BodyPart = EBodyPart::Head;
+    else if (OverlappedComp == TorsoCollider) BodyPart = EBodyPart::Torso;
+    else if (OverlappedComp == LegCollider) BodyPart = EBodyPart::Leg;
+
+    // Drop an item for this hit if we have remaining
+    if (HitsRemaining > 0)
+    {
+        --HitsRemaining;
+        // Attempt to drop now
+        if (ItemDropTable)
+        {
+            // Build a filtered list by body part
+            TArray<FItemDrop*> Candidates;
+            ItemDropTable->GetAllRows<FItemDrop>(TEXT("Drops"), Candidates);
+            TArray<FItemDrop*> Matching;
+            for (FItemDrop* Row : Candidates)
+            {
+                if (Row && Row->BodyPart == BodyPart)
+                {
+                    Matching.Add(Row);
+                }
+            }
+            if (Matching.Num() > 0)
+            {
+                // Weighted rarity selection: Common 70, Uncommon 25, Rare 5
+                auto GetWeight = [](ERarity Rarity)
+                {
+                    switch (Rarity)
+                    {
+                    case ERarity::Common: return 70;
+                    case ERarity::Uncommon: return 25;
+                    case ERarity::Rare: return 5;
+                    default: return 0;
+                    }
+                };
+
+                int32 TotalWeight = 0;
+                for (FItemDrop* R : Matching) TotalWeight += GetWeight(R->Rarity);
+                const int32 Roll = FMath::RandRange(1, FMath::Max(TotalWeight, 1));
+                int32 Accum = 0;
+                FItemDrop* Chosen = Matching[0];
+                for (FItemDrop* R : Matching)
+                {
+                    Accum += GetWeight(R->Rarity);
+                    if (Roll <= Accum) { Chosen = R; break; }
+                }
+
+                // Determine prepared state: placeholder hook for weapon type (not tracked here)
+                EPreparedBy Prepared = EPreparedBy::None;
+                if (FMath::FRand() < 0.5f)
+                {
+                    Prepared = EPreparedBy::None;
+                }
+
+                // Spawn the item actor behind the enemy
+                const FVector Facing = GetActorForwardVector();
+                const FVector SpawnLoc = GetActorLocation() - Facing * 50.f + FVector(0, 0, 30.f);
+                const FRotator SpawnRot = FRotator::ZeroRotator;
+                FActorSpawnParameters Params; Params.Owner = this;
+                if (AItemActor* Item = GetWorld()->SpawnActor<AItemActor>(AItemActor::StaticClass(), SpawnLoc, SpawnRot, Params))
+                {
+                    Item->SetItemMesh(Chosen->ItemMesh);
+                    Item->ImpulseBackward(-Facing, 200.f);
+                }
+            }
+        }
+    }
 }

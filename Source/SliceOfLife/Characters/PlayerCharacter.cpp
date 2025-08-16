@@ -15,6 +15,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "DrawDebugHelpers.h"
 #include "SliceOfLife/Animation/SliceOfLifeAnimInstance.h"
+#include "SliceOfLife/Weapons/WeaponBase.h"
 
 APlayerCharacter::APlayerCharacter(const FObjectInitializer& ObjectInitializer)
     : Super(ObjectInitializer.SetDefaultSubobjectClass<UPlayerMovementComponent>(ACharacter::CharacterMovementComponentName))
@@ -102,6 +103,19 @@ void APlayerCharacter::BeginPlay()
 
     // Normalize actor yaw so PlayerStart rotation doesn't affect side-scroller forward
     SetActorRotation(FRotator(0.f, 0.f, 0.f));
+
+    // Spawn and attach default weapon (Skewer)
+    if (SkewerClass)
+    {
+        FActorSpawnParameters SpawnParams;
+        SpawnParams.Owner = this;
+        CurrentWeapon = GetWorld()->SpawnActor<AWeaponBase>(SkewerClass, GetActorTransform(), SpawnParams);
+        if (CurrentWeapon && GetMesh())
+        {
+            static const FName WeaponSocketName(TEXT("SkewerSocket"));
+            CurrentWeapon->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, WeaponSocketName);
+        }
+    }
 }
 
 void APlayerCharacter::Tick(float DeltaTime)

@@ -56,14 +56,25 @@ void USliceOfLifeAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
     const FVector Velocity = OwnerPawn->GetVelocity();
     Speed = Velocity.Size2D();
 
-    // Falling/jump state
+    // Falling/jump state + double-jump flag (true on second or greater jump)
     if (UCharacterMovementComponent* Move = CachedPlayerCharacter ? CachedPlayerCharacter->GetCharacterMovement() : nullptr)
     {
         bIsInAir = Move->IsFalling();
+        // Prefer our custom movement component's jump tracking if available
+        if (CachedMovementComponent)
+        {
+            const int32 JumpCount = CachedMovementComponent->GetJumpCount();
+            bIsDoubleJump = (JumpCount >= 1);
+        }
+        else
+        {
+            bIsDoubleJump = false;
+        }
     }
     else
     {
         bIsInAir = false;
+        bIsDoubleJump = false;
     }
 
     // Crouch state
@@ -92,7 +103,7 @@ void USliceOfLifeAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
     // Facing right based on velocity X sign (fallback). Designers can override in BP if mesh flip logic differs.
     bFacingRight = Velocity.X >= 0.f;
 
-    // Optional double-jump flag: leave as-is (to be set by character on second jump) unless you want to derive from movement component state
+    // bIsDoubleJump is driven above from CharacterMovementComponent::JumpCurrentCount
 }
 
 void USliceOfLifeAnimInstance::SetFacingRight(bool bRight)

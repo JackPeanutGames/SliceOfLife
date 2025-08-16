@@ -126,6 +126,11 @@ bool UPlayerMovementComponent::IsCrouching() const
 	return bIsCrouching;
 }
 
+int32 UPlayerMovementComponent::GetJumpCount() const
+{
+	return JumpCount;
+}
+
 void UPlayerMovementComponent::UpdateMovementState()
 {
 	if (bIsDashing)

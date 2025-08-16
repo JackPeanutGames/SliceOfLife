@@ -93,6 +93,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Movement")
 	bool IsDashing() const;
 
+	UFUNCTION(BlueprintPure, Category = "Movement")
+	int32 GetJumpCount() const;
+
 	// Note: This overrides UNavMovementComponent::IsCrouching; do not use UFUNCTION here
 	virtual bool IsCrouching() const override;
 

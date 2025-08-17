@@ -21,37 +21,44 @@ enum class EBodyPart : uint8
 };
 
 UENUM(BlueprintType)
-enum class EPreparedBy : uint8
+enum class ECategory : uint8
 {
-	None,
-	Skewer,
-	Crusher,
-	Slicer
+	Limb,
+	Appendage,
+	Organ
 };
 
+UENUM(BlueprintType)
+enum class EPreparedState : uint8
+{
+	None,
+	Skewered,
+	Crushed,
+	Sliced
+};
+
+class AItemDropActor;
+
 USTRUCT(BlueprintType)
-struct FItemDrop : public FTableRowBase
+struct FItemDropRow : public FTableRowBase
 {
 	GENERATED_BODY()
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FName ItemName;
 
+	// Blueprint class to spawn for this item
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	UStaticMesh* ItemMesh = nullptr;
+	TSoftClassPtr<AItemDropActor> ItemClass;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	ERarity Rarity = ERarity::Common;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FString Category; // Limb, Appendage, Organ
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	EBodyPart BodyPart = EBodyPart::Torso;
 
-	// Optional: default prepared state in the table; final prepared state is determined at drop time
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	EPreparedBy PreparedBy = EPreparedBy::None;
+	ECategory Category = ECategory::Organ; // Default; override per row
 };
 
 

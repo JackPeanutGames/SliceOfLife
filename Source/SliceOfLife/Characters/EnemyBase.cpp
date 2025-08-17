@@ -23,6 +23,8 @@
 #include "Engine/DataTable.h"
 #include "SliceOfLife/Items/ItemDropTypes.h"
 #include "SliceOfLife/Items/ItemActor.h"
+#include "SliceOfLife/Items/ItemDropActor.h"
+#include "SliceOfLife/Weapons/WeaponBase.h"
 
 AEnemyBase::AEnemyBase()
 {
@@ -557,10 +559,10 @@ void AEnemyBase::OnBodyPartOverlap(UPrimitiveComponent* OverlappedComp, AActor* 
         if (ItemDropTable)
         {
             // Build a filtered list by body part
-            TArray<FItemDrop*> Candidates;
-            ItemDropTable->GetAllRows<FItemDrop>(TEXT("Drops"), Candidates);
-            TArray<FItemDrop*> Matching;
-            for (FItemDrop* Row : Candidates)
+            TArray<FItemDropRow*> Candidates;
+            ItemDropTable->GetAllRows<FItemDropRow>(TEXT("Drops"), Candidates);
+            TArray<FItemDropRow*> Matching;
+            for (FItemDropRow* Row : Candidates)
             {
                 if (Row && Row->BodyPart == BodyPart)
                 {
@@ -582,32 +584,62 @@ void AEnemyBase::OnBodyPartOverlap(UPrimitiveComponent* OverlappedComp, AActor* 
                 };
 
                 int32 TotalWeight = 0;
-                for (FItemDrop* R : Matching) TotalWeight += GetWeight(R->Rarity);
+                for (FItemDropRow* R : Matching) TotalWeight += GetWeight(R->Rarity);
                 const int32 Roll = FMath::RandRange(1, FMath::Max(TotalWeight, 1));
                 int32 Accum = 0;
-                FItemDrop* Chosen = Matching[0];
-                for (FItemDrop* R : Matching)
+                FItemDropRow* Chosen = Matching[0];
+                for (FItemDropRow* R : Matching)
                 {
                     Accum += GetWeight(R->Rarity);
                     if (Roll <= Accum) { Chosen = R; break; }
                 }
 
-                // Determine prepared state: placeholder hook for weapon type (not tracked here)
-                EPreparedBy Prepared = EPreparedBy::None;
-                if (FMath::FRand() < 0.5f)
+                // Determine prepared state from weapon type (50% chance)
+                EPreparedState PreparedState = EPreparedState::None;
+                EWeaponType WeaponType = EWeaponType::Skewer;
+                if (const AWeaponBase* AsWeapon = Cast<AWeaponBase>(OtherActor))
                 {
-                    Prepared = EPreparedBy::None;
+                    WeaponType = AsWeapon->GetWeaponType();
+                }
+                else if (const AWeaponBase* OwnerWeapon = OtherActor ? Cast<AWeaponBase>(OtherActor->GetOwner()) : nullptr)
+                {
+                    WeaponType = OwnerWeapon->GetWeaponType();
                 }
 
-                // Spawn the item actor behind the enemy
+                if (FMath::RandBool())
+                {
+                    switch (WeaponType)
+                    {
+                    case EWeaponType::Skewer: PreparedState = EPreparedState::Skewered; break;
+                    case EWeaponType::Crusher: PreparedState = EPreparedState::Crushed; break;
+                    case EWeaponType::Slicer: PreparedState = EPreparedState::Sliced; break;
+                    default: break;
+                    }
+                }
+
+                // Spawn the item drop actor behind the enemy
                 const FVector Facing = GetActorForwardVector();
                 const FVector SpawnLoc = GetActorLocation() - Facing * 50.f + FVector(0, 0, 30.f);
                 const FRotator SpawnRot = FRotator::ZeroRotator;
                 FActorSpawnParameters Params; Params.Owner = this;
-                if (AItemActor* Item = GetWorld()->SpawnActor<AItemActor>(AItemActor::StaticClass(), SpawnLoc, SpawnRot, Params))
+                if (Chosen->ItemClass.IsValid())
                 {
-                    Item->SetItemMesh(Chosen->ItemMesh);
-                    Item->ImpulseBackward(-Facing, 200.f);
+                    UClass* ItemClassToSpawn = Chosen->ItemClass.LoadSynchronous();
+                    if (ItemClassToSpawn)
+                    {
+                        if (AItemDropActor* Drop = GetWorld()->SpawnActor<AItemDropActor>(ItemClassToSpawn, SpawnLoc, SpawnRot, Params))
+                        {
+                            Drop->ItemName = Chosen->ItemName;
+                            Drop->Rarity = Chosen->Rarity;
+                            Drop->BodyPart = Chosen->BodyPart;
+                            Drop->Category = Chosen->Category;
+                            Drop->SetPreparedState(PreparedState);
+                            if (Drop->MeshComponent)
+                            {
+                                Drop->MeshComponent->AddImpulse(-Facing * 200.f, NAME_None, true);
+                            }
+                        }
+                    }
                 }
             }
         }

@@ -21,7 +21,7 @@ AWeaponBase::AWeaponBase()
 	Box->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	Box->SetCollisionObjectType(ECC_WorldDynamic);
 	Box->SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Ignore);
-	Box->SetCollisionResponseToChannel(ECC_Pawn, ECollisionResponse::ECR_Overlap);
+	Box->SetCollisionResponseToChannel(ECC_WorldDynamic, ECollisionResponse::ECR_Overlap);
 }
 
 void AWeaponBase::BeginPlay()

@@ -20,6 +20,14 @@ public:
 private:
     void ToggleWeaponHitbox(APlayerCharacter* Player, bool bEnable) const;
     void DrawWeaponHitboxDebug(APlayerCharacter* Player) const;
+
+public:
+    // Optional: override the weapon's hitbox placement for this notify window
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "WeaponHitbox")
+    FVector LocalOffset = FVector::ZeroVector;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "WeaponHitbox")
+    FVector BoxExtent = FVector(20.f, 5.f, 5.f);
 };
 
 

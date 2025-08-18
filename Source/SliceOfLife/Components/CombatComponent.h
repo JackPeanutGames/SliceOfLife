@@ -222,6 +222,10 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Combat|State")
     void EndAttackWindow();
 
+    // Centralized damage application for weapon hitboxes
+    UFUNCTION(BlueprintCallable, Category = "Combat|Damage")
+    void ApplyDamageAndKnockback(AActor* Target, float Damage, const FVector& FacingDirection, float KnockbackForce);
+
 protected:
 	// Combat State
 	UPROPERTY(BlueprintReadOnly, Category = "Combat")

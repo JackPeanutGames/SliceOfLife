@@ -25,6 +25,7 @@ class SLICEOFLIFE_API AWeaponBase : public AActor
 public:
 	AWeaponBase();
 
+	virtual void Tick(float DeltaTime) override;
 	virtual void BeginPlay() override;
 
 	UFUNCTION(BlueprintCallable, Category = "Weapon")
@@ -41,6 +42,10 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Weapon")
 	UPrimitiveComponent* GetHitboxComponent() const { return HitboxComponent; }
+
+	// Optional helper to adjust hitbox shape/offset at runtime (e.g., from notify)
+	UFUNCTION(BlueprintCallable, Category = "Weapon")
+	void ConfigureHitbox(const FVector& LocalOffset, const FVector& BoxExtent);
 
 protected:
 	UFUNCTION()
@@ -62,6 +67,10 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|Params")
 	float KnockbackForce = 500.0f;
+
+	// Debug/State
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Weapon|Debug")
+	bool bHitboxActive = false;
 };
 
 

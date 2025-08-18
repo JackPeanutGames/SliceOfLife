@@ -11,6 +11,7 @@
 #include "Components/BoxComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "SliceOfLife/Characters/PlayerCharacter.h"
+#include "SliceOfLife/Weapons/WeaponBase.h"
 #include "DrawDebugHelpers.h"
 #include "Engine/DamageEvents.h"
 #include "HAL/IConsoleManager.h"
@@ -179,6 +180,21 @@ void UCombatComponent::StartAttack(const FAttackData& AttackData)
 			*AttackData.AttackName, StaleMultiplier);
 	}
 	
+    // Feed current attack params to equipped weapon if present
+    if (APlayerCharacter* OwnerChar = Cast<APlayerCharacter>(GetOwner()))
+    {
+        TArray<AActor*> Attached;
+        OwnerChar->GetAttachedActors(Attached);
+        for (AActor* AttachedActor : Attached)
+        {
+            if (AWeaponBase* Weapon = Cast<AWeaponBase>(AttachedActor))
+            {
+                Weapon->SetAttackParams(CurrentAttack.Damage, CurrentAttack.KnockbackForce);
+                break;
+            }
+        }
+    }
+
     // Notify-driven hitboxes handle overlap & damage; no timed fallback
 
     // Play montage if available
@@ -239,6 +255,46 @@ void UCombatComponent::StartAttack(const FAttackData& AttackData)
     }
 }
 
+void UCombatComponent::ApplyDamageAndKnockback(AActor* Target, float Damage, const FVector& FacingDirection, float KnockbackForce)
+{
+    if (!Target)
+    {
+        return;
+    }
+
+    AActor* OwnerActor = GetOwner();
+    AController* InstigatorController = nullptr;
+    if (APawn* PawnOwner = Cast<APawn>(OwnerActor))
+    {
+        InstigatorController = PawnOwner->GetController();
+    }
+
+    // Prefer our health component pipeline if the target has one
+    if (UHealthComponent* TargetHealth = Target->FindComponentByClass<UHealthComponent>())
+    {
+        TargetHealth->TakeDamage(Damage, FacingDirection, KnockbackForce, OwnerActor);
+    }
+    else
+    {
+        FPointDamageEvent PointEvent;
+        Target->TakeDamage(Damage, PointEvent, InstigatorController, OwnerActor);
+        if (ACharacter* TargetChar = Cast<ACharacter>(Target))
+        {
+            FVector LaunchVelocity = FacingDirection * KnockbackForce;
+            TargetChar->LaunchCharacter(LaunchVelocity, true, true);
+        }
+    }
+
+    // Debug hit confirmation (global CVAR)
+    static const auto CVarShowHitboxes = IConsoleManager::Get().FindConsoleVariable(TEXT("SliceOfLife.ShowHitboxes"));
+    const bool bShow = CVarShowHitboxes ? (CVarShowHitboxes->GetInt() != 0) : false;
+    if (bShow && OwnerActor)
+    {
+        const FVector Impact = Target->GetActorLocation();
+        DrawDebugPoint(OwnerActor->GetWorld(), Impact, 16.f, FColor::Yellow, false, 0.2f);
+    }
+}
+
 void UCombatComponent::UpdateAttack(float DeltaTime)
 {
 	switch (CurrentAttackState)
@@ -285,6 +341,21 @@ void UCombatComponent::EndAttack()
 	}
 	
 	UE_LOG(LogTemp, Log, TEXT("Attack ended"));
+
+	// Safety: ensure any equipped weapon hitbox is disabled when attack ends
+	if (APlayerCharacter* OwnerChar = Cast<APlayerCharacter>(GetOwner()))
+	{
+		TArray<AActor*> Attached;
+		OwnerChar->GetAttachedActors(Attached);
+		for (AActor* A : Attached)
+		{
+			if (AWeaponBase* Weapon = Cast<AWeaponBase>(A))
+			{
+				Weapon->DisableHitbox();
+				break;
+			}
+		}
+	}
 }
 
 // SpawnHitbox() deleted; notify-driven UBoxComponent overlaps are the sole damage path now
@@ -296,8 +367,7 @@ void UCombatComponent::DetectHits()
 
 void UCombatComponent::SpawnHitboxParams(const FVector& LocalOffset, const FVector& BoxExtent, float Damage, float KnockbackForce)
 {
-    // Legacy path not used now that notify-spawned hitboxes call overlap directly.
-    // Keep parameters for overlap callback to use damage values.
+    // Only used for fist attacks (no weapon equipped)
     PendingHitboxLocalOffset = LocalOffset;
     PendingHitboxExtent = BoxExtent;
     PendingHitboxDamage = Damage;
@@ -380,7 +450,7 @@ void UCombatComponent::OnHitboxBeginOverlap(UPrimitiveComponent* OverlappedComp,
         }
     }
 
-    // Destroy the hitbox component after hit
+    // Destroy the spawned generic hitbox (only for fist attacks)
     if (UPrimitiveComponent* Comp = OverlappedComp)
     {
         Comp->DestroyComponent();

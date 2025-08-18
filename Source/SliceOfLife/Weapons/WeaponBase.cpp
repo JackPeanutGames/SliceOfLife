@@ -1,14 +1,19 @@
 #include "SliceOfLife/Weapons/WeaponBase.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/BoxComponent.h"
+#include "Components/SphereComponent.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Engine/DamageEvents.h"
+#include "DrawDebugHelpers.h"
+#include "HAL/IConsoleManager.h"
+#include "SliceOfLife/Components/CombatComponent.h"
+#include "SliceOfLife/Characters/PlayerCharacter.h"
 
 AWeaponBase::AWeaponBase()
 {
-	PrimaryActorTick.bCanEverTick = false;
+	PrimaryActorTick.bCanEverTick = true;
 
 	WeaponMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("WeaponMesh"));
 	SetRootComponent(WeaponMesh);
@@ -19,9 +24,8 @@ AWeaponBase::AWeaponBase()
 	Box->SetupAttachment(WeaponMesh);
 	Box->SetBoxExtent(FVector(20.f, 5.f, 5.f));
 	Box->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	Box->SetCollisionObjectType(ECC_WorldDynamic);
-	Box->SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Ignore);
-	Box->SetCollisionResponseToChannel(ECC_WorldDynamic, ECollisionResponse::ECR_Overlap);
+	Box->SetCollisionProfileName(TEXT("WeaponHitbox"));
+	Box->SetGenerateOverlapEvents(false);
 }
 
 void AWeaponBase::BeginPlay()
@@ -34,12 +38,45 @@ void AWeaponBase::BeginPlay()
 	}
 }
 
+void AWeaponBase::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+
+	static const auto CVarShowHitboxes = IConsoleManager::Get().FindConsoleVariable(TEXT("SliceOfLife.ShowHitboxes"));
+	const bool bShow = CVarShowHitboxes ? (CVarShowHitboxes->GetInt() != 0) : false;
+	if (!bShow)
+	{
+		return;
+	}
+
+	if (UWorld* World = GetWorld())
+	{
+		const FColor DebugColor = bHitboxActive ? FColor::Red : FColor::Yellow;
+		if (auto* Box = Cast<UBoxComponent>(HitboxComponent))
+		{
+			DrawDebugBox(World, Box->GetComponentLocation(),
+				     Box->GetScaledBoxExtent(), Box->GetComponentRotation().Quaternion(),
+				     DebugColor, false, 0.f, 0, 2.f);
+		}
+		else if (auto* Sphere = Cast<USphereComponent>(HitboxComponent))
+		{
+			DrawDebugSphere(World, Sphere->GetComponentLocation(),
+					    Sphere->GetScaledSphereRadius(), 16,
+					    DebugColor, false, 0.f, 0, 2.f);
+		}
+	}
+}
+
 void AWeaponBase::EnableHitbox()
 {
 	if (HitboxComponent)
 	{
+		HitboxComponent->SetCollisionProfileName(TEXT("WeaponHitbox"));
 		HitboxComponent->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+		HitboxComponent->SetCollisionResponseToAllChannels(ECR_Ignore);
+		HitboxComponent->SetCollisionResponseToChannel(ECC_WorldDynamic, ECR_Overlap);
 		HitboxComponent->SetGenerateOverlapEvents(true);
+		bHitboxActive = true;
 	}
 }
 
@@ -48,7 +85,20 @@ void AWeaponBase::DisableHitbox()
 	if (HitboxComponent)
 	{
 		HitboxComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		HitboxComponent->SetCollisionResponseToAllChannels(ECR_Ignore);
 		HitboxComponent->SetGenerateOverlapEvents(false);
+		bHitboxActive = false;
+	}
+}
+
+void AWeaponBase::ConfigureHitbox(const FVector& LocalOffset, const FVector& BoxExtent)
+{
+	if (UBoxComponent* Box = Cast<UBoxComponent>(HitboxComponent))
+	{
+		Box->SetBoxExtent(BoxExtent, true);
+		FVector AdjustedOffset = LocalOffset;
+		AdjustedOffset.X = 0.f; // center on 2.5D plane like legacy path
+		Box->SetRelativeLocation(AdjustedOffset);
 	}
 }
 
@@ -73,24 +123,35 @@ void AWeaponBase::OnHitboxOverlap(UPrimitiveComponent* OverlappedComp, AActor* O
 		return;
 	}
 
-	// Knockback based on owner facing (X axis in 2.5D)
-	const FVector Facing = OwnerCharacter->GetActorForwardVector();
-
-	AController* InstigatorController = OwnerCharacter->GetController();
-	FPointDamageEvent PointEvent;
-	OtherActor->TakeDamage(Damage, PointEvent, InstigatorController, OwnerActor);
-
-	if (ACharacter* HitChar = Cast<ACharacter>(OtherActor))
+	// Knockback based on player facing vector if available
+	FVector Facing = OwnerCharacter->GetActorForwardVector();
+	if (const APlayerCharacter* Player = Cast<APlayerCharacter>(OwnerCharacter))
 	{
-		const FVector LaunchVel = Facing * KnockbackForce;
-		if (UCharacterMovementComponent* Move = HitChar->GetCharacterMovement())
+		Facing = Player->GetFacingVector();
+	}
+
+	if (UCombatComponent* Combat = OwnerCharacter->FindComponentByClass<UCombatComponent>())
+	{
+		Combat->ApplyDamageAndKnockback(OtherActor, Damage, Facing, KnockbackForce);
+	}
+	else
+	{
+		// Fallback to generic damage application if no combat component
+		AController* InstigatorController = OwnerCharacter->GetController();
+		FPointDamageEvent PointEvent;
+		OtherActor->TakeDamage(Damage, PointEvent, InstigatorController, OwnerActor);
+		if (ACharacter* HitChar = Cast<ACharacter>(OtherActor))
 		{
-			Move->DisableMovement();
-			Move->Velocity = LaunchVel;
-		}
-		else
-		{
-			HitChar->LaunchCharacter(LaunchVel, true, true);
+			const FVector LaunchVel = Facing * KnockbackForce;
+			if (UCharacterMovementComponent* Move = HitChar->GetCharacterMovement())
+			{
+				Move->DisableMovement();
+				Move->Velocity = LaunchVel;
+			}
+			else
+			{
+				HitChar->LaunchCharacter(LaunchVel, true, true);
+			}
 		}
 	}
 }

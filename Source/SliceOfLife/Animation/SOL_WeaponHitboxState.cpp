@@ -17,19 +17,25 @@ void USOL_WeaponHitboxState::NotifyBegin(USkeletalMeshComponent* MeshComp, UAnim
     if (!MeshComp) return;
     if (APlayerCharacter* Player = Cast<APlayerCharacter>(MeshComp->GetOwner()))
     {
-        ToggleWeaponHitbox(Player, true);
-        DrawWeaponHitboxDebug(Player);
+        // Configure and enable the current weapon's hitbox
+        TArray<AActor*> Attached;
+        Player->GetAttachedActors(Attached);
+        for (AActor* A : Attached)
+        {
+            if (AWeaponBase* Weapon = Cast<AWeaponBase>(A))
+            {
+                Weapon->ConfigureHitbox(LocalOffset, BoxExtent);
+                ToggleWeaponHitbox(Player, true);
+                break;
+            }
+        }
     }
 }
 
 void USOL_WeaponHitboxState::NotifyTick(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation, float FrameDeltaTime, const FAnimNotifyEventReference& EventReference)
 {
     if (!MeshComp) return;
-    if (!ShouldDrawHitboxes()) return;
-    if (APlayerCharacter* Player = Cast<APlayerCharacter>(MeshComp->GetOwner()))
-    {
-        DrawWeaponHitboxDebug(Player);
-    }
+    // Weapon draws its own debug in Tick when the cvar is on
 }
 
 void USOL_WeaponHitboxState::NotifyEnd(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation, const FAnimNotifyEventReference& EventReference)
@@ -38,7 +44,6 @@ void USOL_WeaponHitboxState::NotifyEnd(USkeletalMeshComponent* MeshComp, UAnimSe
     if (APlayerCharacter* Player = Cast<APlayerCharacter>(MeshComp->GetOwner()))
     {
         ToggleWeaponHitbox(Player, false);
-        // No persistent debug; drawing stops when disabled
     }
 }
 

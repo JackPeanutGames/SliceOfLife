@@ -23,6 +23,9 @@ AItemDropActor::AItemDropActor()
 	CollisionComponent->SetGenerateOverlapEvents(true);
 	CollisionComponent->SetCollisionProfileName(TEXT("ItemPickup"));
 
+	// Default to 2.5D constraint at construction time
+	ApplyPlaneConstraintSettings();
+	
 	CollisionComponent->OnComponentBeginOverlap.AddDynamic(this, &AItemDropActor::OnOverlapBegin);
 }
 
@@ -48,6 +51,11 @@ void AItemDropActor::OnOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor*
 		OnPickedUp(Player);
 		Destroy();
 	}
+}
+
+void AItemDropActor::ApplyPlaneConstraintSettings()
+{
+	
 }
 
 

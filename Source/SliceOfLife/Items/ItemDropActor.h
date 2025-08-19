@@ -46,7 +46,7 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Item")
 	void SetPreparedState(EPreparedState NewState);
-
+	
 	// Overlap
 	UFUNCTION()
 	void OnOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
@@ -54,6 +54,8 @@ public:
 	// Blueprint event for pickup
 	UFUNCTION(BlueprintImplementableEvent, Category = "Item")
 	void OnPickedUp(APlayerCharacter* Player);
+
+	void ApplyPlaneConstraintSettings();
 };
 
 

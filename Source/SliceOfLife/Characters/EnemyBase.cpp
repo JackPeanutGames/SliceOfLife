@@ -115,6 +115,9 @@ AEnemyBase::AEnemyBase()
 
 	// Set default stats
 	EnemyStats = FEnemyStats();
+	
+	// Initialize remaining drops (randomize between 2-4 drops)
+	RemainingDrops = FMath::RandRange(2, 4);
 
     // Create combat component
     CombatComponent = CreateDefaultSubobject<UCombatComponent>(TEXT("CombatComponent"));
@@ -502,11 +505,18 @@ void AEnemyBase::OnDamageReceived(float Damage, FVector KnockbackDirection, floa
 	// Call blueprint event
 	OnEnemyDamaged(Damage, nullptr);
 
-	// Check if enemy is dead
+	// Check if enemy is dead from health
 	if (HealthComponent && !HealthComponent->IsAlive())
 	{
 		SetEnemyState(EEnemyState::Dead);
 		OnEnemyDeath();
+		return;
+	}
+	
+	// Check if enemy should die from no more drops
+	if (RemainingDrops <= 0)
+	{
+		Die();
 		return;
 	}
 
@@ -541,6 +551,32 @@ void AEnemyBase::ReactToHit()
 	}
 }
 
+void AEnemyBase::ResetSwingHits()
+{
+	const int32 PreviousCount = HitByWeaponsThisSwing.Num();
+	HitByWeaponsThisSwing.Empty();
+	UE_LOG(LogTemp, Log, TEXT("Enemy %s reset swing hits (cleared %d weapons)"), *GetName(), PreviousCount);
+}
+
+void AEnemyBase::Die()
+{
+	UE_LOG(LogTemp, Log, TEXT("Enemy %s is dying"), *GetName());
+	
+	// Call blueprint event for death effects
+	OnEnemyDeath();
+	
+	// Stop all movement and AI
+	StopMovement();
+	SetEnemyState(EEnemyState::Dead);
+	
+	// Destroy the enemy after a short delay to allow death effects to play
+	FTimerHandle DestroyTimerHandle;
+	GetWorld()->GetTimerManager().SetTimer(DestroyTimerHandle, [this]()
+	{
+		Destroy();
+	}, 1.0f, false);
+}
+
 void AEnemyBase::OnBodyPartOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp,
     int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
@@ -553,16 +589,53 @@ void AEnemyBase::OnBodyPartOverlap(UPrimitiveComponent* OverlappedComp, AActor* 
     // Basic guard
     if (!OtherActor || OtherActor == this) return;
 
+    // Find the weapon that hit us (either directly or through its owner)
+    AWeaponBase* HittingWeapon = nullptr;
+    if (AWeaponBase* AsWeapon = Cast<AWeaponBase>(OtherActor))
+    {
+        HittingWeapon = AsWeapon;
+    }
+    else if (AWeaponBase* OwnerWeapon = OtherActor ? Cast<AWeaponBase>(OtherActor->GetOwner()) : nullptr)
+    {
+        HittingWeapon = OwnerWeapon;
+    }
+    
+    // If no weapon found, this might be a fist attack or other hitbox
+    // For now, we'll use a dummy pointer to track these hits too
+    if (!HittingWeapon)
+    {
+        // Create a unique identifier for non-weapon hits (e.g., fist attacks)
+        // We'll use the OtherActor as a key since it's unique per attack
+        if (HitByWeaponsThisSwing.Contains(TWeakObjectPtr<AWeaponBase>(nullptr)))
+        {
+            return; // Already hit by a non-weapon attack this swing
+        }
+        HitByWeaponsThisSwing.Add(TWeakObjectPtr<AWeaponBase>(nullptr));
+    }
+    else
+    {
+        // Check if this weapon has already hit us this swing
+        if (HitByWeaponsThisSwing.Contains(TWeakObjectPtr<AWeaponBase>(HittingWeapon)))
+        {
+            return; // Already hit by this weapon this swing
+        }
+        HitByWeaponsThisSwing.Add(TWeakObjectPtr<AWeaponBase>(HittingWeapon));
+    }
+
     // Determine body part
     EBodyPart BodyPart = EBodyPart::Torso;
     if (OverlappedComp == HeadCollider) BodyPart = EBodyPart::Head;
     else if (OverlappedComp == TorsoCollider) BodyPart = EBodyPart::Torso;
     else if (OverlappedComp == LegCollider) BodyPart = EBodyPart::Leg;
 
-    // Drop an item for this hit if we have remaining
-    if (HitsRemaining > 0)
+    // Drop an item for this hit if we have remaining drops
+    if (RemainingDrops > 0)
     {
-        --HitsRemaining;
+        --RemainingDrops;
+        UE_LOG(LogTemp, Log, TEXT("Enemy %s hit on %s, remaining drops: %d"), *GetName(), 
+               BodyPart == EBodyPart::Head ? TEXT("Head") : BodyPart == EBodyPart::Torso ? TEXT("Torso") : TEXT("Leg"), 
+               RemainingDrops);
+        
         // Attempt to drop now
         if (ItemDropTable)
         {
@@ -605,13 +678,9 @@ void AEnemyBase::OnBodyPartOverlap(UPrimitiveComponent* OverlappedComp, AActor* 
                 // Determine prepared state from weapon type (50% chance)
                 EPreparedState PreparedState = EPreparedState::None;
                 EWeaponType WeaponType = EWeaponType::Skewer;
-                if (const AWeaponBase* AsWeapon = Cast<AWeaponBase>(OtherActor))
+                if (HittingWeapon)
                 {
-                    WeaponType = AsWeapon->GetWeaponType();
-                }
-                else if (const AWeaponBase* OwnerWeapon = OtherActor ? Cast<AWeaponBase>(OtherActor->GetOwner()) : nullptr)
-                {
-                    WeaponType = OwnerWeapon->GetWeaponType();
+                    WeaponType = HittingWeapon->GetWeaponType();
                 }
 
                 if (FMath::RandBool())
@@ -630,7 +699,7 @@ void AEnemyBase::OnBodyPartOverlap(UPrimitiveComponent* OverlappedComp, AActor* 
                 const FVector SpawnLoc = GetActorLocation() - Facing * 50.f + FVector(0, 0, 30.f);
                 const FRotator SpawnRot = FRotator::ZeroRotator;
                 FActorSpawnParameters Params; Params.Owner = this;
-                 if (Chosen->ItemClass.IsValid())
+                if (Chosen->ItemClass.IsValid())
                 {
                     UClass* ItemClassToSpawn = Chosen->ItemClass.LoadSynchronous();
                     if (ItemClassToSpawn)
@@ -650,6 +719,14 @@ void AEnemyBase::OnBodyPartOverlap(UPrimitiveComponent* OverlappedComp, AActor* 
                     }
                 }
             }
+        }
+        
+        // Check if we've dropped all our items
+        if (RemainingDrops <= 0)
+        {
+            UE_LOG(LogTemp, Log, TEXT("Enemy %s has no more drops, dying"), *GetName());
+            Die();
+            return;
         }
     }
 }

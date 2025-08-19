@@ -11,7 +11,9 @@
 #include "Components/BoxComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "SliceOfLife/Characters/PlayerCharacter.h"
+#include "SliceOfLife/Characters/EnemyBase.h"
 #include "SliceOfLife/Weapons/WeaponBase.h"
+#include "EngineUtils.h"
 #include "DrawDebugHelpers.h"
 #include "Engine/DamageEvents.h"
 #include "HAL/IConsoleManager.h"
@@ -356,6 +358,18 @@ void UCombatComponent::EndAttack()
 			}
 		}
 	}
+	
+	// Reset swing hits on all enemies so they can be hit by the next attack
+	if (UWorld* World = GetWorld())
+	{
+		for (TActorIterator<AEnemyBase> EnemyIt(World); EnemyIt; ++EnemyIt)
+		{
+			if (AEnemyBase* Enemy = *EnemyIt)
+			{
+				Enemy->ResetSwingHits();
+			}
+		}
+	}
 }
 
 // SpawnHitbox() deleted; notify-driven UBoxComponent overlaps are the sole damage path now
@@ -470,6 +484,18 @@ void UCombatComponent::BeginAttackWindow()
 void UCombatComponent::EndAttackWindow()
 {
     ActorsHitThisSwing.Reset();
+    
+    // Reset swing hits on all enemies so they can be hit by the next attack
+    if (UWorld* World = GetWorld())
+    {
+        for (TActorIterator<AEnemyBase> EnemyIt(World); EnemyIt; ++EnemyIt)
+        {
+            if (AEnemyBase* Enemy = *EnemyIt)
+            {
+                Enemy->ResetSwingHits();
+            }
+        }
+    }
 }
 
 float UCombatComponent::CalculateStaleMultiplier(const FString& MoveName)

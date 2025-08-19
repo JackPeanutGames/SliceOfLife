@@ -4,6 +4,7 @@
 #include "GameFramework/Character.h"
 #include "SliceOfLife/Components/HealthComponent.h"
 #include "SliceOfLife/Components/CombatComponent.h"
+#include "SliceOfLife/Weapons/WeaponBase.h"
 #include "EnemyBase.generated.h"
 
 class UBehaviorTree;
@@ -132,6 +133,17 @@ public:
 	UFUNCTION(BlueprintImplementableEvent, Category = "Enemy Events")
 	void OnEnemyDeath();
 
+	// Hit tracking and death management
+	UFUNCTION(BlueprintCallable, Category = "Enemy Combat")
+	void ResetSwingHits();
+	
+	UFUNCTION(BlueprintCallable, Category = "Enemy Combat")
+	void Die();
+	
+	// Debug and info methods
+	UFUNCTION(BlueprintPure, Category = "Enemy|Debug")
+	int32 GetRemainingDrops() const { return RemainingDrops; }
+
 protected:
 	// Components
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
@@ -246,6 +258,12 @@ protected:
     float LastHeadHitTime = -1000.f;
     float LastTorsoHitTime = -1000.f;
     float LastLegHitTime = -1000.f;
+    
+    // Track weapons that have hit this enemy during the current attack swing
+    TSet<TWeakObjectPtr<AWeaponBase>> HitByWeaponsThisSwing;
+    
+    // Track remaining drops for this enemy
+    int32 RemainingDrops = 0;
 
 protected:
     UFUNCTION()

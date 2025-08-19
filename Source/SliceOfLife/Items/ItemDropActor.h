@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "GameFramework/ProjectileMovementComponent.h"
 #include "SliceOfLife/Items/ItemDropTypes.h"
 #include "ItemDropActor.generated.h"
 
@@ -27,6 +28,9 @@ public:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	USphereComponent* CollisionComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UProjectileMovementComponent* ProjectileMovement;
 
 	// Metadata
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item")
@@ -55,7 +59,29 @@ public:
 	UFUNCTION(BlueprintImplementableEvent, Category = "Item")
 	void OnPickedUp(APlayerCharacter* Player);
 
+	// 2.5D constraint toggle — if true, constrains movement to Y=0 plane
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|PlaneConstraint")
+	bool bConstrainToYPlane = true;
+
+	// Launch settings for designers to tweak
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Launch")
+	float MinLaunchSpeed = 200.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Launch")
+	float MaxLaunchSpeed = 400.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Launch")
+	float BounceVelocity = 0.6f;
+
 	void ApplyPlaneConstraintSettings();
+
+	// Launch the item in a given direction
+	UFUNCTION(BlueprintCallable, Category = "Movement")
+	void LaunchItem(const FVector& Direction, float Speed = -1.0f);
+
+	// Launch the item with a specific velocity vector
+	UFUNCTION(BlueprintCallable, Category = "Movement")
+	void LaunchItemWithVelocity(const FVector& Velocity);
 };
 
 

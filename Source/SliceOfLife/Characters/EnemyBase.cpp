@@ -634,10 +634,10 @@ void AEnemyBase::OnBodyPartOverlap(UPrimitiveComponent* OverlappedComp, AActor* 
                             Drop->BodyPart = Chosen->BodyPart;
                             Drop->Category = Chosen->Category;
                             Drop->SetPreparedState(PreparedState);
-                            if (Drop->MeshComponent)
-                            {
-                                Drop->MeshComponent->AddImpulse(-Facing * 200.f, NAME_None, true);
-                            }
+                            
+                            // Launch the item using the new projectile movement system
+                            FVector LaunchDirection = -Facing; // Away from the enemy
+                            Drop->LaunchItem(LaunchDirection);
                         }
                     }
                 }

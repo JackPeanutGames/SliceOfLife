@@ -40,6 +40,15 @@ AEnemyBase::AEnemyBase()
     if (UCapsuleComponent* Capsule = GetCapsuleComponent())
     {
         Capsule->InitCapsuleSize(40.0f, 100.0f); // radius, half-height
+        
+        // Configure collision rules for the enemy root capsule
+        Capsule->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+        Capsule->SetCollisionObjectType(ECC_WorldDynamic);
+        Capsule->SetGenerateOverlapEvents(true);
+        Capsule->SetCollisionResponseToAllChannels(ECR_Ignore);
+        Capsule->SetCollisionResponseToChannel(ECC_WorldStatic, ECR_Block);    // stand on ground
+        Capsule->SetCollisionResponseToChannel(ECC_Pawn, ECR_Block);          // block player
+        Capsule->SetCollisionResponseToChannel(ECC_WorldDynamic, ECR_Overlap); // overlap weapons & drops
     }
 
     // Body part hit colliders
@@ -63,19 +72,18 @@ AEnemyBase::AEnemyBase()
     LegCollider->InitCapsuleSize(30.f, 40.f);
     LegCollider->SetRelativeLocation(FVector(0.f, 0.f, 10.f));
 
-    // Set overlap collision for body parts (overlap with weapon hitboxes)
-    auto ConfigureOverlap = [](UPrimitiveComponent* Comp)
+    // Configure body part hitboxes (overlap with weapon hitboxes, no blocking)
+    auto ConfigureHitbox = [](UPrimitiveComponent* Comp)
     {
         if (!Comp) return;
         Comp->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
         Comp->SetCollisionObjectType(ECC_WorldDynamic);
-        Comp->SetCollisionResponseToAllChannels(ECR_Ignore);
-        Comp->SetCollisionResponseToChannel(ECC_WorldDynamic, ECR_Overlap);
         Comp->SetGenerateOverlapEvents(true);
+        Comp->SetCollisionResponseToAllChannels(ECR_Overlap);  // no blocking, only overlap
     };
-    ConfigureOverlap(HeadCollider);
-    ConfigureOverlap(TorsoCollider);
-    ConfigureOverlap(LegCollider);
+    ConfigureHitbox(HeadCollider);
+    ConfigureHitbox(TorsoCollider);
+    ConfigureHitbox(LegCollider);
 
     HeadCollider->OnComponentBeginOverlap.AddDynamic(this, &AEnemyBase::OnBodyPartOverlap);
     TorsoCollider->OnComponentBeginOverlap.AddDynamic(this, &AEnemyBase::OnBodyPartOverlap);
@@ -622,7 +630,7 @@ void AEnemyBase::OnBodyPartOverlap(UPrimitiveComponent* OverlappedComp, AActor* 
                 const FVector SpawnLoc = GetActorLocation() - Facing * 50.f + FVector(0, 0, 30.f);
                 const FRotator SpawnRot = FRotator::ZeroRotator;
                 FActorSpawnParameters Params; Params.Owner = this;
-                if (Chosen->ItemClass.IsValid())
+                 if (Chosen->ItemClass.IsValid())
                 {
                     UClass* ItemClassToSpawn = Chosen->ItemClass.LoadSynchronous();
                     if (ItemClassToSpawn)

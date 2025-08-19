@@ -7,28 +7,34 @@ AItemDropActor::AItemDropActor()
 {
 	PrimaryActorTick.bCanEverTick = false;
 
-	MeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Mesh"));
-	SetRootComponent(MeshComponent);
-	MeshComponent->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
-	MeshComponent->SetSimulatePhysics(false);
-	MeshComponent->SetCollisionProfileName(TEXT("ItemPickup"));
-
+	// Create collision component as root (handles gameplay interactions)
 	CollisionComponent = CreateDefaultSubobject<USphereComponent>(TEXT("Collision"));
-	CollisionComponent->SetupAttachment(RootComponent);
+	SetRootComponent(CollisionComponent);
 	CollisionComponent->InitSphereRadius(24.f);
+	
+	// Create mesh component (visual only, attached to collision)
+	MeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Mesh"));
+	MeshComponent->SetupAttachment(CollisionComponent);
+	
+	// Configure mesh collision (no physics, just visual)
+	MeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	MeshComponent->SetSimulatePhysics(false);
+	
+	// Configure collision rules for item drops
 	CollisionComponent->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 	CollisionComponent->SetCollisionObjectType(ECC_WorldDynamic);
-	CollisionComponent->SetCollisionResponseToAllChannels(ECR_Ignore);
-	CollisionComponent->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
 	CollisionComponent->SetGenerateOverlapEvents(true);
-	CollisionComponent->SetCollisionProfileName(TEXT("ItemPickup"));
+	CollisionComponent->SetCollisionResponseToAllChannels(ECR_Ignore);
+	CollisionComponent->SetCollisionResponseToChannel(ECC_WorldStatic, ECR_Block);    // keep on ground
+	CollisionComponent->SetCollisionResponseToChannel(ECC_WorldDynamic, ECR_Overlap); // overlap weapons, enemies, other items
+	CollisionComponent->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);        // allow player pickup
 
 	// Default to 2.5D constraint at construction time
 	ApplyPlaneConstraintSettings();
 	
 	// Create and configure projectile movement component
 	ProjectileMovement = CreateDefaultSubobject<UProjectileMovementComponent>(TEXT("ProjectileMovement"));
-	ProjectileMovement->UpdatedComponent = MeshComponent;
+	ProjectileMovement->UpdatedComponent = CollisionComponent; // Use collision component for movement
 	ProjectileMovement->bRotationFollowsVelocity = false;
 	ProjectileMovement->bShouldBounce = true;
 	ProjectileMovement->ProjectileGravityScale = 1.0f;
@@ -66,7 +72,13 @@ void AItemDropActor::OnOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor*
 
 	if (APlayerCharacter* Player = Cast<APlayerCharacter>(OtherActor))
 	{
+		// Add the item to the player's inventory based on its category
+		Player->AddItemToInventory(Category);
+		
+		// Call the Blueprint event for any additional pickup effects
 		OnPickedUp(Player);
+		
+		// Destroy the item drop
 		Destroy();
 	}
 }

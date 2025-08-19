@@ -23,8 +23,10 @@ AWeaponBase::AWeaponBase()
 	HitboxComponent = Box;
 	Box->SetupAttachment(WeaponMesh);
 	Box->SetBoxExtent(FVector(20.f, 5.f, 5.f));
+	
+	// Initialize hitbox with no collision (will be enabled when attacking)
 	Box->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	Box->SetCollisionProfileName(TEXT("WeaponHitbox"));
+	Box->SetCollisionObjectType(ECC_WorldDynamic);
 	Box->SetGenerateOverlapEvents(false);
 }
 
@@ -71,11 +73,13 @@ void AWeaponBase::EnableHitbox()
 {
 	if (HitboxComponent)
 	{
-		HitboxComponent->SetCollisionProfileName(TEXT("WeaponHitbox"));
+		// Configure weapon hitbox collision rules
 		HitboxComponent->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
-		HitboxComponent->SetCollisionResponseToAllChannels(ECR_Ignore);
-		HitboxComponent->SetCollisionResponseToChannel(ECC_WorldDynamic, ECR_Overlap);
+		HitboxComponent->SetCollisionObjectType(ECC_WorldDynamic);
 		HitboxComponent->SetGenerateOverlapEvents(true);
+		HitboxComponent->SetCollisionResponseToAllChannels(ECR_Ignore);
+		HitboxComponent->SetCollisionResponseToChannel(ECC_WorldDynamic, ECR_Overlap); // overlap enemies & drops
+		HitboxComponent->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);        // overlap player if needed (e.g., for self-damage)
 		bHitboxActive = true;
 	}
 }

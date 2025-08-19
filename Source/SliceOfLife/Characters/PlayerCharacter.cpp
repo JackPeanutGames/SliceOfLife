@@ -31,6 +31,15 @@ APlayerCharacter::APlayerCharacter(const FObjectInitializer& ObjectInitializer)
     if (UCapsuleComponent* Capsule = GetCapsuleComponent())
     {
         Capsule->InitCapsuleSize(50.0f, 50.0f); // radius, half-height (units in cm)
+        
+        // Configure collision rules for the player capsule
+        Capsule->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+        Capsule->SetCollisionObjectType(ECC_Pawn);
+        Capsule->SetGenerateOverlapEvents(true);
+        Capsule->SetCollisionResponseToAllChannels(ECR_Ignore);
+        Capsule->SetCollisionResponseToChannel(ECC_WorldStatic, ECR_Block);    // stand on floors
+        Capsule->SetCollisionResponseToChannel(ECC_WorldDynamic, ECR_Overlap); // overlap enemies & item drops
+        Capsule->SetCollisionResponseToChannel(ECC_Pawn, ECR_Block);          // block other pawns
     }
 
     // Setup camera boom
@@ -386,4 +395,76 @@ float APlayerCharacter::TakeDamage(float DamageAmount, struct FDamageEvent const
         HealthComponent->TakeDamage(Actual, KnockDir, KnockForce, DamageCauser);
     }
     return Actual;
+}
+
+void APlayerCharacter::AddItemToInventory(ECategory Category)
+{
+    switch (Category)
+    {
+        case ECategory::Limb:
+            ++NumLimbs;
+            UE_LOG(LogTemp, Log, TEXT("Added Limb to inventory. Total: %d"), NumLimbs);
+            break;
+        case ECategory::Appendage:
+            ++NumAppendages;
+            UE_LOG(LogTemp, Log, TEXT("Added Appendage to inventory. Total: %d"), NumAppendages);
+            break;
+        case ECategory::Organ:
+            ++NumOrgans;
+            UE_LOG(LogTemp, Log, TEXT("Added Organ to inventory. Total: %d"), NumOrgans);
+            break;
+        default:
+            UE_LOG(LogTemp, Warning, TEXT("Unknown category: %d"), (int32)Category);
+            break;
+    }
+}
+
+void APlayerCharacter::ResetInventory()
+{
+    NumLimbs = 0;
+    NumAppendages = 0;
+    NumOrgans = 0;
+    UE_LOG(LogTemp, Log, TEXT("Inventory reset to zero"));
+}
+
+void APlayerCharacter::DisplayInventoryStatus()
+{
+    UE_LOG(LogTemp, Log, TEXT("=== INVENTORY STATUS ==="));
+    UE_LOG(LogTemp, Log, TEXT("Limbs: %d"), NumLimbs);
+    UE_LOG(LogTemp, Log, TEXT("Appendages: %d"), NumAppendages);
+    UE_LOG(LogTemp, Log, TEXT("Organs: %d"), NumOrgans);
+    UE_LOG(LogTemp, Log, TEXT("Total: %d"), GetTotalInventoryCount());
+    UE_LOG(LogTemp, Log, TEXT("====================="));
+}
+
+FString APlayerCharacter::GetInventoryDisplayString() const
+{
+    return FString::Printf(TEXT("Limbs: %d | Appendages: %d | Organs: %d | Total: %d"), 
+                           NumLimbs, NumAppendages, NumOrgans, GetTotalInventoryCount());
+}
+
+bool APlayerCharacter::HasEnoughItems(int32 RequiredLimbs, int32 RequiredAppendages, int32 RequiredOrgans) const
+{
+    return (NumLimbs >= RequiredLimbs) && 
+           (NumAppendages >= RequiredAppendages) && 
+           (NumOrgans >= RequiredOrgans);
+}
+
+bool APlayerCharacter::ConsumeItems(int32 LimbsToConsume, int32 AppendagesToConsume, int32 OrgansToConsume)
+{
+    // Check if we have enough items
+    if (!HasEnoughItems(LimbsToConsume, AppendagesToConsume, OrgansToConsume))
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Not enough items to consume. Required: L:%d A:%d O:%d, Have: L:%d A:%d O:%d"), 
+               LimbsToConsume, AppendagesToConsume, OrgansToConsume, NumLimbs, NumAppendages, NumOrgans);
+        return false;
+    }
+
+    // Consume the items
+    NumLimbs -= LimbsToConsume;
+    NumAppendages -= AppendagesToConsume;
+    NumOrgans -= OrgansToConsume;
+
+    UE_LOG(LogTemp, Log, TEXT("Consumed items. Remaining: L:%d A:%d O:%d"), NumLimbs, NumAppendages, NumOrgans);
+    return true;
 }

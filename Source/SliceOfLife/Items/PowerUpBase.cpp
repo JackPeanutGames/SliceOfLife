@@ -17,9 +17,15 @@ APowerUpBase::APowerUpBase()
 
 	CollisionComponent = CreateDefaultSubobject<USphereComponent>(TEXT("CollisionComponent"));
 	CollisionComponent->SetupAttachment(RootComponent);
+	
+	// Configure collision rules for power-ups
 	CollisionComponent->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+	CollisionComponent->SetCollisionObjectType(ECC_WorldDynamic);
+	CollisionComponent->SetGenerateOverlapEvents(true);
 	CollisionComponent->SetCollisionResponseToAllChannels(ECR_Ignore);
-	CollisionComponent->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
+	CollisionComponent->SetCollisionResponseToChannel(ECC_WorldStatic, ECR_Block);    // keep on ground
+	CollisionComponent->SetCollisionResponseToChannel(ECC_WorldDynamic, ECR_Overlap); // overlap other items
+	CollisionComponent->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);        // allow player pickup
 
 	// Initialize state
 	bIsCollected = false;

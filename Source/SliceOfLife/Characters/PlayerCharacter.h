@@ -4,6 +4,7 @@
 #include "GameFramework/Character.h"
 #include "InputActionValue.h"
 #include "SliceOfLife/Components/CombatComponent.h" // for EAttackState and FAttackData accessors
+#include "SliceOfLife/Items/ItemDropTypes.h" // for ECategory enum
 #include "PlayerCharacter.generated.h"
 
 class UPlayerMovementComponent;
@@ -230,4 +231,50 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Health")
 	float GetHealthPercent() const { return CurrentHealthPercent; }
+
+	// Inventory Counters
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Inventory")
+	int32 NumLimbs = 0;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Inventory")
+	int32 NumAppendages = 0;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Inventory")
+	int32 NumOrgans = 0;
+
+	// Inventory Methods
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	void AddItemToInventory(ECategory Category);
+
+	UFUNCTION(BlueprintPure, Category = "Inventory")
+	int32 GetNumLimbs() const { return NumLimbs; }
+
+	UFUNCTION(BlueprintPure, Category = "Inventory")
+	int32 GetNumAppendages() const { return NumAppendages; }
+
+	UFUNCTION(BlueprintPure, Category = "Inventory")
+	int32 GetNumOrgans() const { return NumOrgans; }
+
+	UFUNCTION(BlueprintPure, Category = "Inventory")
+	int32 GetTotalInventoryCount() const { return NumLimbs + NumAppendages + NumOrgans; }
+
+	// Debug method to reset inventory (useful for testing)
+	UFUNCTION(BlueprintCallable, Category = "Inventory|Debug")
+	void ResetInventory();
+
+	// Debug method to display current inventory status
+	UFUNCTION(BlueprintCallable, Category = "Inventory|Debug")
+	void DisplayInventoryStatus();
+
+	// Get formatted inventory string for UI display
+	UFUNCTION(BlueprintPure, Category = "Inventory|UI")
+	FString GetInventoryDisplayString() const;
+
+	// Check if player has enough items for recipes/quests
+	UFUNCTION(BlueprintPure, Category = "Inventory|Quests")
+	bool HasEnoughItems(int32 RequiredLimbs, int32 RequiredAppendages, int32 RequiredOrgans) const;
+
+	// Consume items for crafting (returns false if not enough items)
+	UFUNCTION(BlueprintCallable, Category = "Inventory|Crafting")
+	bool ConsumeItems(int32 LimbsToConsume, int32 AppendagesToConsume, int32 OrgansToConsume);
 };

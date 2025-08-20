@@ -647,15 +647,6 @@ void AEnemyBase::DisableWeaponHitbox()
 void AEnemyBase::OnBodyPartOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp,
     int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
-    // Record hit time for flash (only when hit by active weapons)
-    const float Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
-    if (HittingWeapon && HittingWeapon->IsHitboxActive())
-    {
-        if (OverlappedComp == HeadCollider) LastHeadHitTime = Now;
-        else if (OverlappedComp == TorsoCollider) LastTorsoHitTime = Now;
-        else if (OverlappedComp == LegCollider) LastLegHitTime = Now;
-    }
-
     // Basic guard
     if (!OtherActor || OtherActor == this) return;
 
@@ -682,6 +673,12 @@ void AEnemyBase::OnBodyPartOverlap(UPrimitiveComponent* OverlappedComp, AActor* 
         UE_LOG(LogTemp, Verbose, TEXT("Enemy %s overlap ignored: weapon %s hitbox not active"), *GetName(), *HittingWeapon->GetName());
         return;
     }
+    
+    // Record hit time for flash (only when hit by active weapons)
+    const float Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
+    if (OverlappedComp == HeadCollider) LastHeadHitTime = Now;
+    else if (OverlappedComp == TorsoCollider) LastTorsoHitTime = Now;
+    else if (OverlappedComp == LegCollider) LastLegHitTime = Now;
     
     // Check if this weapon has already hit us this swing
     if (HitByWeaponsThisSwing.Contains(TWeakObjectPtr<AWeaponBase>(HittingWeapon)))

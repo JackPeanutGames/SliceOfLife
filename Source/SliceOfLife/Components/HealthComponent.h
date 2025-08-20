@@ -7,6 +7,7 @@
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnDamageReceived, float, Damage, FVector, KnockbackDirection, float, KnockbackForce);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHealthChanged, float, NewHealth);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHitstunChanged, bool, bInHitstun);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnHealthReachedZero);
 
 USTRUCT(BlueprintType)
 struct FWeightSettings
@@ -57,6 +58,7 @@ public:
 
 	virtual void BeginPlay() override;
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	// Health Management
 	UFUNCTION(BlueprintCallable, Category = "Health")
@@ -102,6 +104,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Health")
 	float GetRemainingHitstunTime() const { return HitstunTimer; }
+	
+	UFUNCTION(BlueprintPure, Category = "Health")
+	FVector GetCurrentKnockbackVelocity() const { return CurrentKnockbackVelocity; }
 
 	// Events
 	UPROPERTY(BlueprintAssignable, Category = "Health")
@@ -112,6 +117,9 @@ public:
 
 	UPROPERTY(BlueprintAssignable, Category = "Health")
 	FOnHitstunChanged OnHitstunChanged;
+	
+	UPROPERTY(BlueprintAssignable, Category = "Health")
+	FOnHealthReachedZero OnHealthReachedZero;
 
 	// Settings
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Health")
@@ -131,10 +139,10 @@ public:
 
 protected:
 	// Current State
-	UPROPERTY(BlueprintReadOnly, Category = "Health")
+	UPROPERTY(BlueprintReadOnly, Replicated, Category = "Health")
 	float CurrentHealth;
 
-	UPROPERTY(BlueprintReadOnly, Category = "Health")
+	UPROPERTY(BlueprintReadOnly, Replicated, Category = "Health")
 	float CurrentDamagePercent;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Health")

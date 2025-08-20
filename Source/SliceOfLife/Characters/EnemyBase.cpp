@@ -18,6 +18,7 @@
 #include "UObject/ConstructorHelpers.h"
 #include "HAL/IConsoleManager.h"
 #include "DrawDebugHelpers.h"
+#include "Components/BoxComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/SphereComponent.h"
 #include "Engine/DataTable.h"
@@ -52,9 +53,9 @@ AEnemyBase::AEnemyBase()
     }
 
     // Body part hit colliders
-    HeadCollider = CreateDefaultSubobject<USphereComponent>(TEXT("HeadCollider"));
-    TorsoCollider = CreateDefaultSubobject<UCapsuleComponent>(TEXT("TorsoCollider"));
-    LegCollider = CreateDefaultSubobject<UCapsuleComponent>(TEXT("LegCollider"));
+    HeadCollider = CreateDefaultSubobject<UBoxComponent>(TEXT("HeadCollider"));
+    TorsoCollider = CreateDefaultSubobject<UBoxComponent>(TEXT("TorsoCollider"));
+    LegCollider = CreateDefaultSubobject<UBoxComponent>(TEXT("LegCollider"));
 
     if (GetMesh())
     {
@@ -62,15 +63,15 @@ AEnemyBase::AEnemyBase()
         TorsoCollider->SetupAttachment(GetMesh());
         LegCollider->SetupAttachment(GetMesh());
     }
-    // Approximate placements relative to mesh origin
-    HeadCollider->SetSphereRadius(20.f);
-    HeadCollider->SetRelativeLocation(FVector(0.f, 0.f, 90.f));
+    // Apply designer-configurable hitbox settings
+    HeadCollider->SetBoxExtent(HeadBoxExtent);
+    HeadCollider->SetRelativeLocation(HeadRelativeLocation);
 
-    TorsoCollider->InitCapsuleSize(35.f, 50.f);
-    TorsoCollider->SetRelativeLocation(FVector(0.f, 0.f, 50.f));
+    TorsoCollider->SetBoxExtent(TorsoBoxExtent);
+    TorsoCollider->SetRelativeLocation(TorsoRelativeLocation);
 
-    LegCollider->InitCapsuleSize(30.f, 40.f);
-    LegCollider->SetRelativeLocation(FVector(0.f, 0.f, 10.f));
+    LegCollider->SetBoxExtent(LegBoxExtent);
+    LegCollider->SetRelativeLocation(LegRelativeLocation);
 
     // Configure body part hitboxes (overlap with weapon hitboxes, no blocking)
     auto ConfigureHitbox = [](UPrimitiveComponent* Comp)
@@ -177,9 +178,33 @@ void AEnemyBase::BeginPlay()
         }
     }
 
-    // Attach weapon mesh if provided
+    // Spawn and attach weapon actor if weapon mesh is provided
     if (GetMesh() && WeaponMesh)
     {
+        // Spawn a weapon actor
+        FActorSpawnParameters SpawnParams;
+        SpawnParams.Owner = this;
+        SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+        
+        // Get the world and spawn the weapon
+        if (UWorld* World = GetWorld())
+        {
+            // For now, we'll spawn a generic WeaponBase
+            // TODO: Allow designers to specify weapon class in editor
+            AWeaponBase* SpawnedWeapon = World->SpawnActor<AWeaponBase>(AWeaponBase::StaticClass(), GetActorTransform(), SpawnParams);
+            if (SpawnedWeapon)
+            {
+                // Attach the weapon to the enemy
+                SpawnedWeapon->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, WeaponSocketName);
+                
+                // Set weapon properties
+                SpawnedWeapon->SetAttackParams(20.0f, 300.0f); // Default enemy weapon damage
+                
+                UE_LOG(LogTemp, Log, TEXT("Enemy %s spawned weapon"), *GetName());
+            }
+        }
+        
+        // Keep the old mesh component for backward compatibility
         WeaponMeshComponent = NewObject<UStaticMeshComponent>(this, TEXT("WeaponMeshComponent"));
         if (WeaponMeshComponent)
         {
@@ -227,23 +252,25 @@ void AEnemyBase::DebugDrawBodyColliders()
     {
         const bool bFlash = (Now - LastHeadHitTime) < FlashDuration;
         const FColor Color = bFlash ? FColor::Red : FColor::Green;
-        DrawDebugSphere(GetWorld(), HeadCollider->GetComponentLocation(), HeadCollider->GetScaledSphereRadius(), 12, Color, false, 0.f, 0, 1.5f);
+        const FVector BoxExtent = HeadCollider->GetScaledBoxExtent();
+        const FTransform& CompToWorld = HeadCollider->GetComponentTransform();
+        DrawDebugBox(GetWorld(), CompToWorld.GetLocation(), BoxExtent, CompToWorld.GetRotation(), Color, false, 0.f, 0, 2.f);
     }
     if (TorsoCollider)
     {
         const bool bFlash = (Now - LastTorsoHitTime) < FlashDuration;
         const FColor Color = bFlash ? FColor::Red : FColor::Green;
-        const float HalfHeight = Cast<UCapsuleComponent>(TorsoCollider)->GetScaledCapsuleHalfHeight();
-        const float Radius = Cast<UCapsuleComponent>(TorsoCollider)->GetScaledCapsuleRadius();
-        DrawDebugCapsule(GetWorld(), TorsoCollider->GetComponentLocation(), HalfHeight, Radius, FQuat::Identity, Color, false, 0.f, 0, 1.5f);
+        const FVector BoxExtent = TorsoCollider->GetScaledBoxExtent();
+        const FTransform& CompToWorld = TorsoCollider->GetComponentTransform();
+        DrawDebugBox(GetWorld(), CompToWorld.GetLocation(), BoxExtent, CompToWorld.GetRotation(), Color, false, 0.f, 0, 2.f);
     }
     if (LegCollider)
     {
         const bool bFlash = (Now - LastLegHitTime) < FlashDuration;
         const FColor Color = bFlash ? FColor::Red : FColor::Green;
-        const float HalfHeight = Cast<UCapsuleComponent>(LegCollider)->GetScaledCapsuleHalfHeight();
-        const float Radius = Cast<UCapsuleComponent>(LegCollider)->GetScaledCapsuleRadius();
-        DrawDebugCapsule(GetWorld(), LegCollider->GetComponentLocation(), HalfHeight, Radius, FQuat::Identity, Color, false, 0.f, 0, 1.5f);
+        const FVector BoxExtent = LegCollider->GetScaledBoxExtent();
+        const FTransform& CompToWorld = LegCollider->GetComponentTransform();
+        DrawDebugBox(GetWorld(), CompToWorld.GetLocation(), BoxExtent, CompToWorld.GetRotation(), Color, false, 0.f, 0, 2.f);
     }
 }
 
@@ -577,6 +604,46 @@ void AEnemyBase::Die()
 	}, 1.0f, false);
 }
 
+void AEnemyBase::EnableWeaponHitbox()
+{
+	if (WeaponMeshComponent)
+	{
+		// Find the weapon actor attached to this component
+		TArray<AActor*> AttachedActors;
+		GetAttachedActors(AttachedActors);
+		
+		for (AActor* AttachedActor : AttachedActors)
+		{
+			if (AWeaponBase* Weapon = Cast<AWeaponBase>(AttachedActor))
+			{
+				Weapon->EnableHitbox();
+				UE_LOG(LogTemp, Log, TEXT("Enemy %s enabled weapon hitbox"), *GetName());
+				break;
+			}
+		}
+	}
+}
+
+void AEnemyBase::DisableWeaponHitbox()
+{
+	if (WeaponMeshComponent)
+	{
+		// Find the weapon actor attached to this component
+		TArray<AActor*> AttachedActors;
+		GetAttachedActors(AttachedActors);
+		
+		for (AActor* AttachedActor : AttachedActors)
+		{
+			if (AWeaponBase* Weapon = Cast<AWeaponBase>(AttachedActor))
+			{
+				Weapon->DisableHitbox();
+				UE_LOG(LogTemp, Log, TEXT("Enemy %s disabled weapon hitbox"), *GetName());
+				break;
+			}
+		}
+	}
+}
+
 void AEnemyBase::OnBodyPartOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp,
     int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
@@ -728,5 +795,64 @@ void AEnemyBase::OnBodyPartOverlap(UPrimitiveComponent* OverlappedComp, AActor* 
             Die();
             return;
         }
+    }
+}
+
+void AEnemyBase::RefreshHitboxConfigurations()
+{
+    if (HeadCollider)
+    {
+        HeadCollider->SetBoxExtent(HeadBoxExtent);
+        HeadCollider->SetRelativeLocation(HeadRelativeLocation);
+    }
+    
+    if (TorsoCollider)
+    {
+        TorsoCollider->SetBoxExtent(TorsoBoxExtent);
+        TorsoCollider->SetRelativeLocation(TorsoRelativeLocation);
+    }
+    
+    if (LegCollider)
+    {
+        LegCollider->SetBoxExtent(LegBoxExtent);
+        LegCollider->SetRelativeLocation(LegRelativeLocation);
+    }
+    
+    UE_LOG(LogTemp, Log, TEXT("Enemy %s refreshed hitbox configurations"), *GetName());
+}
+
+void AEnemyBase::SetHeadHitbox(FVector NewExtent, FVector NewLocation)
+{
+    HeadBoxExtent = NewExtent;
+    HeadRelativeLocation = NewLocation;
+    
+    if (HeadCollider)
+    {
+        HeadCollider->SetBoxExtent(HeadBoxExtent);
+        HeadCollider->SetRelativeLocation(HeadRelativeLocation);
+    }
+}
+
+void AEnemyBase::SetTorsoHitbox(FVector NewExtent, FVector NewLocation)
+{
+    TorsoBoxExtent = NewExtent;
+    TorsoRelativeLocation = NewLocation;
+    
+    if (TorsoCollider)
+    {
+        TorsoCollider->SetBoxExtent(TorsoBoxExtent);
+        TorsoCollider->SetRelativeLocation(TorsoRelativeLocation);
+    }
+}
+
+void AEnemyBase::SetLegHitbox(FVector NewExtent, FVector NewLocation)
+{
+    LegBoxExtent = NewExtent;
+    LegRelativeLocation = NewLocation;
+    
+    if (LegCollider)
+    {
+        LegCollider->SetBoxExtent(LegBoxExtent);
+        LegCollider->SetRelativeLocation(LegRelativeLocation);
     }
 }

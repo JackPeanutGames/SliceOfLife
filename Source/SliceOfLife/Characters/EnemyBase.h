@@ -14,6 +14,7 @@ class UAISenseConfig_Sight;
 class UStaticMeshComponent;
 class USphereComponent;
 class UCapsuleComponent;
+class UBoxComponent;
 
 UENUM(BlueprintType)
 enum class EEnemyState : uint8
@@ -140,9 +141,48 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Enemy Combat")
 	void Die();
 	
+	// Weapon hitbox management
+	UFUNCTION(BlueprintCallable, Category = "Enemy Combat")
+	void EnableWeaponHitbox();
+	
+	UFUNCTION(BlueprintCallable, Category = "Enemy Combat")
+	void DisableWeaponHitbox();
+	
 	// Debug and info methods
 	UFUNCTION(BlueprintPure, Category = "Enemy|Debug")
 	int32 GetRemainingDrops() const { return RemainingDrops; }
+
+	// Hitbox configuration methods
+	UFUNCTION(BlueprintCallable, Category = "Enemy|Hitboxes")
+	void RefreshHitboxConfigurations();
+
+	// Individual hitbox getters/setters for Blueprint access
+	UFUNCTION(BlueprintCallable, Category = "Enemy|Hitboxes")
+	void SetHeadHitbox(FVector NewExtent, FVector NewLocation);
+
+	UFUNCTION(BlueprintCallable, Category = "Enemy|Hitboxes")
+	void SetTorsoHitbox(FVector NewExtent, FVector NewLocation);
+
+	UFUNCTION(BlueprintCallable, Category = "Enemy|Hitboxes")
+	void SetLegHitbox(FVector NewExtent, FVector NewLocation);
+
+	UFUNCTION(BlueprintPure, Category = "Enemy|Hitboxes")
+	FVector GetHeadHitboxExtent() const { return HeadBoxExtent; }
+
+	UFUNCTION(BlueprintPure, Category = "Enemy|Hitboxes")
+	FVector GetHeadHitboxLocation() const { return HeadRelativeLocation; }
+
+	UFUNCTION(BlueprintPure, Category = "Enemy|Hitboxes")
+	FVector GetTorsoHitboxExtent() const { return TorsoBoxExtent; }
+
+	UFUNCTION(BlueprintPure, Category = "Enemy|Hitboxes")
+	FVector GetTorsoHitboxLocation() const { return TorsoRelativeLocation; }
+
+	UFUNCTION(BlueprintPure, Category = "Enemy|Hitboxes")
+	FVector GetLegHitboxExtent() const { return LegBoxExtent; }
+
+	UFUNCTION(BlueprintPure, Category = "Enemy|Hitboxes")
+	FVector GetLegHitboxLocation() const { return LegRelativeLocation; }
 
 protected:
 	// Components
@@ -166,14 +206,33 @@ protected:
     UStaticMeshComponent* PlaceholderHead;
 
     // Body part colliders for hit detection
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Hitboxes")
-    USphereComponent* HeadCollider;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hitboxes")
+    UBoxComponent* HeadCollider;
 
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Hitboxes")
-    UCapsuleComponent* TorsoCollider;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hitboxes")
+    UBoxComponent* TorsoCollider;
 
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Hitboxes")
-    UCapsuleComponent* LegCollider;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hitboxes")
+    UBoxComponent* LegCollider;
+
+    // Designer-configurable hitbox settings
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hitboxes|Head")
+    FVector HeadBoxExtent = FVector(20.f, 10.f, 20.f);
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hitboxes|Head")
+    FVector HeadRelativeLocation = FVector(0.f, 0.f, 90.f);
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hitboxes|Torso")
+    FVector TorsoBoxExtent = FVector(35.f, 10.f, 50.f);
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hitboxes|Torso")
+    FVector TorsoRelativeLocation = FVector(0.f, 0.f, 50.f);
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hitboxes|Legs")
+    FVector LegBoxExtent = FVector(30.f, 10.f, 40.f);
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hitboxes|Legs")
+    FVector LegRelativeLocation = FVector(0.f, 0.f, 10.f);
 
     // Weapon visual attached to socket (e.g., Skewer)
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")

@@ -135,19 +135,19 @@ protected:
     void SetFacing(bool bRight);
 
     // Designer-tunable movement settings applied to CharacterMovement
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Movement|Tuning")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Tuning")
     float DesignerMaxWalkSpeed = 600.0f;
 
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Movement|Tuning")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Tuning")
     float DesignerMaxWalkSpeedCrouched = 300.0f;
 
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Movement|Tuning")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Tuning")
     float DesignerJumpZVelocity = 600.0f;
 
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Movement|Tuning")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Tuning")
     float DesignerAirControl = 0.5f;
 
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Movement|Tuning")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Tuning")
     float DesignerGravityScale = 1.0f;
 
 	// Movement State

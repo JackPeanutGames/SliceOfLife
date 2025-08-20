@@ -22,7 +22,7 @@ AWeaponBase::AWeaponBase()
 	UBoxComponent* Box = CreateDefaultSubobject<UBoxComponent>(TEXT("Hitbox"));
 	HitboxComponent = Box;
 	Box->SetupAttachment(WeaponMesh);
-	Box->SetBoxExtent(FVector(20.f, 5.f, 5.f));
+	Box->SetBoxExtent(FVector(160.f, 60.f, 15.f));
 	
 	// Initialize hitbox with no collision (will be enabled when attacking)
 	Box->SetCollisionEnabled(ECollisionEnabled::NoCollision);

@@ -21,6 +21,9 @@ public:
 
     UFUNCTION(BlueprintCallable, Category = "UI")
     void UpdatePlayerStateDisplay(float DamagePercent, const FString& StateLabel, FVector2D Velocity);
+    
+    UFUNCTION(BlueprintCallable, Category = "UI")
+    void UpdatePlayerHealthDisplay(float HealthPercent);
 
     // Debug/tuning widget creation in C++ (optional path)
     UFUNCTION(BlueprintCallable, Category = "UI")

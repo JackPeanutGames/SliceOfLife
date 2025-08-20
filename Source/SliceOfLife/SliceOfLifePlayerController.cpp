@@ -27,6 +27,13 @@ void ASliceOfLifePlayerController::UpdatePlayerStateDisplay(float DamagePercent,
     // Implemented in BP. This native function serves as a callable hook from C++ if needed
 }
 
+void ASliceOfLifePlayerController::UpdatePlayerHealthDisplay(float HealthPercent)
+{
+    // Update the health display in the UI
+    // This will be implemented in Blueprint to update the health bar
+    UE_LOG(LogTemp, Log, TEXT("Player health updated: %.1f%%"), HealthPercent * 100.0f);
+}
+
 void ASliceOfLifePlayerController::CreateDebugWidgetsNative()
 {
     if (StateDisplayClass && !StateDisplayWidget)

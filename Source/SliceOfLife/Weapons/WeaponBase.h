@@ -43,6 +43,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Weapon")
 	UPrimitiveComponent* GetHitboxComponent() const { return HitboxComponent; }
 
+	UFUNCTION(BlueprintPure, Category = "Weapon")
+	bool IsHitboxActive() const { return bHitboxActive; }
+
 	// Optional helper to adjust hitbox shape/offset at runtime (e.g., from notify)
 	UFUNCTION(BlueprintCallable, Category = "Weapon")
 	void ConfigureHitbox(const FVector& LocalOffset, const FVector& BoxExtent);

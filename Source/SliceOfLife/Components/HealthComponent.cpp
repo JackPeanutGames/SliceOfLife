@@ -3,10 +3,14 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Engine/World.h"
 #include "SliceOfLife/SliceOfLifePlayerState.h"
+#include "Net/UnrealNetwork.h"
 
 UHealthComponent::UHealthComponent()
 {
 	PrimaryComponentTick.bCanEverTick = true;
+	
+	// Set up replication
+	//SetIsReplicated(true);
 	
 	// Initialize default values
 	CurrentHealth = MaxHealth;
@@ -26,6 +30,14 @@ void UHealthComponent::BeginPlay()
 	
 	CurrentHealth = MaxHealth;
 	CurrentDamagePercent = 0.0f;
+}
+
+void UHealthComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	
+	DOREPLIFETIME(UHealthComponent, CurrentHealth);
+	DOREPLIFETIME(UHealthComponent, CurrentDamagePercent);
 }
 
 void UHealthComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
@@ -73,6 +85,10 @@ void UHealthComponent::TakeDamage(float Damage, FVector KnockbackDirection, floa
 	if (CurrentHealth <= 0.0f && bCanBeKnockedOut)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Actor %s has been knocked out!"), *GetOwner()->GetName());
+		
+		// Broadcast health reached zero event
+		OnHealthReachedZero.Broadcast();
+		
 		// Additional knockout logic can be added here
 	}
 }

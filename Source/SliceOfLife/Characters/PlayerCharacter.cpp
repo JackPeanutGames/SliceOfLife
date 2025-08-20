@@ -16,6 +16,7 @@
 #include "DrawDebugHelpers.h"
 #include "SliceOfLife/Animation/SliceOfLifeAnimInstance.h"
 #include "SliceOfLife/Weapons/WeaponBase.h"
+#include "SliceOfLife/SliceOfLifePlayerController.h"
 
 APlayerCharacter::APlayerCharacter(const FObjectInitializer& ObjectInitializer)
     : Super(ObjectInitializer.SetDefaultSubobjectClass<UPlayerMovementComponent>(ACharacter::CharacterMovementComponentName))
@@ -68,6 +69,13 @@ APlayerCharacter::APlayerCharacter(const FObjectInitializer& ObjectInitializer)
 	bIsCharging = false;
 	bIsInHitstun = false;
 	CurrentHealthPercent = 1.0f;
+	
+	// Set initial health
+	if (HealthComponent)
+	{
+		HealthComponent->SetMaxHealth(100.0f);
+		HealthComponent->ResetHealth();
+	}
 
     PreviousAttackState = EAttackState::Idle;
     bHasHitThisSwing = false;
@@ -92,6 +100,7 @@ void APlayerCharacter::BeginPlay()
 	{
 		HealthComponent->OnHealthChanged.AddDynamic(this, &APlayerCharacter::OnHealthChanged);
 		HealthComponent->OnHitstunChanged.AddDynamic(this, &APlayerCharacter::OnHitstunChanged);
+		HealthComponent->OnHealthReachedZero.AddDynamic(this, &APlayerCharacter::Die);
 	}
 
     // Try to add mapping context at BeginPlay (controller may not be valid yet)
@@ -367,12 +376,112 @@ void APlayerCharacter::OnHealthChanged(float NewHealth)
 	if (HealthComponent)
 	{
 		CurrentHealthPercent = HealthComponent->GetHealthPercent();
+		
+		// Notify the player controller to update the UI
+		if (AController* PlayerController = GetController())
+		{
+			if (APlayerController* PC = Cast<APlayerController>(PlayerController))
+			{
+				if (ASliceOfLifePlayerController* SOLPC = Cast<ASliceOfLifePlayerController>(PC))
+				{
+					SOLPC->UpdatePlayerHealthDisplay(CurrentHealthPercent);
+				}
+			}
+		}
 	}
 }
 
 void APlayerCharacter::OnHitstunChanged(bool bInHitstun)
 {
 	bIsInHitstun = bInHitstun;
+	
+	if (bInHitstun)
+	{
+		// Disable movement during hitstun
+		if (PlayerMovementComponent)
+		{
+			PlayerMovementComponent->SetMovementMode(MOVE_None);
+		}
+		
+		// Apply knockback effect
+		if (HealthComponent)
+		{
+			FVector KnockbackDirection = HealthComponent->GetCurrentKnockbackVelocity().GetSafeNormal();
+			float KnockbackForce = HealthComponent->GetCurrentKnockbackVelocity().Size();
+			
+			if (KnockbackDirection.IsNearlyZero())
+			{
+				// Fallback to backward knockback if no direction specified
+				KnockbackDirection = -GetActorForwardVector();
+			}
+			
+			// Launch character with knockback
+			LaunchCharacter(KnockbackDirection * KnockbackForce, true, true);
+		}
+		
+		UE_LOG(LogTemp, Log, TEXT("Player entered hitstun"));
+	}
+	else
+	{
+		// Re-enable movement when hitstun ends
+		if (PlayerMovementComponent)
+		{
+			PlayerMovementComponent->SetMovementMode(MOVE_Walking);
+		}
+		
+		UE_LOG(LogTemp, Log, TEXT("Player exited hitstun"));
+	}
+}
+
+void APlayerCharacter::Die()
+{
+	UE_LOG(LogTemp, Warning, TEXT("Player %s has died!"), *GetName());
+	
+	// Disable input
+	DisableInput(GetWorld()->GetFirstPlayerController());
+	
+	// Stop all movement
+	if (PlayerMovementComponent)
+	{
+		PlayerMovementComponent->StopMovementImmediately();
+	}
+	
+	// Play death animation or ragdoll
+	// TODO: Implement death animation montage
+	
+	// Set a timer to respawn after delay
+	if (UWorld* World = GetWorld())
+	{
+		FTimerHandle RespawnTimer;
+		World->GetTimerManager().SetTimer(RespawnTimer, this, &APlayerCharacter::Respawn, 3.0f, false);
+	}
+}
+
+void APlayerCharacter::Respawn()
+{
+	UE_LOG(LogTemp, Log, TEXT("Player %s is respawning"), *GetName());
+	
+	// Reset health
+	if (HealthComponent)
+	{
+		HealthComponent->ResetHealth();
+	}
+	
+	// Reset position to spawn point or last checkpoint
+	// TODO: Implement proper spawn point system
+	FVector SpawnLocation = FVector(0.0f, 0.0f, 100.0f); // Default spawn location
+	SetActorLocation(SpawnLocation);
+	
+	// Re-enable input
+	EnableInput(GetWorld()->GetFirstPlayerController());
+	
+	// Re-enable movement
+	if (PlayerMovementComponent)
+	{
+		PlayerMovementComponent->SetMovementMode(MOVE_Walking);
+	}
+	
+	UE_LOG(LogTemp, Log, TEXT("Player %s has respawned"), *GetName());
 }
 
 void APlayerCharacter::UpdateCombatState()

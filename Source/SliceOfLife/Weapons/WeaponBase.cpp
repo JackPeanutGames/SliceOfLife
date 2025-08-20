@@ -127,35 +127,61 @@ void AWeaponBase::OnHitboxOverlap(UPrimitiveComponent* OverlappedComp, AActor* O
 		return;
 	}
 
-	// Knockback based on player facing vector if available
+	// Determine if this is a player weapon or enemy weapon
+	bool bIsPlayerWeapon = Cast<APlayerCharacter>(OwnerCharacter) != nullptr;
+	bool bIsEnemyWeapon = !bIsPlayerWeapon; // Enemy if not player
+
+	// Determine knockback direction based on owner's facing
 	FVector Facing = OwnerCharacter->GetActorForwardVector();
 	if (const APlayerCharacter* Player = Cast<APlayerCharacter>(OwnerCharacter))
 	{
 		Facing = Player->GetFacingVector();
 	}
 
-	if (UCombatComponent* Combat = OwnerCharacter->FindComponentByClass<UCombatComponent>())
+	// Handle player weapon hitting enemy
+	if (bIsPlayerWeapon)
 	{
-		Combat->ApplyDamageAndKnockback(OtherActor, Damage, Facing, KnockbackForce);
-	}
-	else
-	{
-		// Fallback to generic damage application if no combat component
-		AController* InstigatorController = OwnerCharacter->GetController();
-		FPointDamageEvent PointEvent;
-		OtherActor->TakeDamage(Damage, PointEvent, InstigatorController, OwnerActor);
-		if (ACharacter* HitChar = Cast<ACharacter>(OtherActor))
+		if (UCombatComponent* Combat = OwnerCharacter->FindComponentByClass<UCombatComponent>())
 		{
-			const FVector LaunchVel = Facing * KnockbackForce;
-			if (UCharacterMovementComponent* Move = HitChar->GetCharacterMovement())
+			Combat->ApplyDamageAndKnockback(OtherActor, Damage, Facing, KnockbackForce);
+		}
+		else
+		{
+			// Fallback to generic damage application if no combat component
+			AController* InstigatorController = OwnerCharacter->GetController();
+			FPointDamageEvent PointEvent;
+			OtherActor->TakeDamage(Damage, PointEvent, InstigatorController, OwnerActor);
+			if (ACharacter* HitChar = Cast<ACharacter>(OtherActor))
 			{
-				Move->DisableMovement();
-				Move->Velocity = LaunchVel;
+				const FVector LaunchVel = Facing * KnockbackForce;
+				if (UCharacterMovementComponent* Move = HitChar->GetCharacterMovement())
+				{
+					Move->DisableMovement();
+					Move->Velocity = LaunchVel;
+				}
+				else
+				{
+					HitChar->LaunchCharacter(LaunchVel, true, true);
+				}
 			}
-			else
-			{
-				HitChar->LaunchCharacter(LaunchVel, true, true);
-			}
+		}
+	}
+	// Handle enemy weapon hitting player
+	else if (bIsEnemyWeapon)
+	{
+		if (APlayerCharacter* Player = Cast<APlayerCharacter>(OtherActor))
+		{
+			// Use UGameplayStatics::ApplyPointDamage for proper damage handling
+			AController* InstigatorController = OwnerCharacter->GetController();
+			FPointDamageEvent PointEvent;
+			
+			// Calculate hit direction from enemy to player
+			FVector HitDirection = (Player->GetActorLocation() - OwnerCharacter->GetActorLocation()).GetSafeNormal();
+			
+			// Apply damage to player
+			Player->TakeDamage(Damage, PointEvent, InstigatorController, OwnerActor);
+			
+			UE_LOG(LogTemp, Log, TEXT("Enemy weapon hit player for %f damage"), Damage);
 		}
 	}
 }

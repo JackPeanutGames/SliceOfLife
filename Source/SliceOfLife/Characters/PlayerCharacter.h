@@ -105,6 +105,13 @@ protected:
     // Must be UFUNCTION for AddDynamic binding
     UFUNCTION()
     void OnHitstunChanged(bool bInHitstun);
+    
+    // Death and respawn
+    UFUNCTION(BlueprintCallable, Category = "Health")
+    void Die();
+    
+    UFUNCTION(BlueprintCallable, Category = "Health")
+    void Respawn();
 
 	// Components
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")

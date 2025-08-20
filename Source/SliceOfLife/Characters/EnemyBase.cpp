@@ -647,11 +647,14 @@ void AEnemyBase::DisableWeaponHitbox()
 void AEnemyBase::OnBodyPartOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp,
     int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
-    // Record hit time for flash
+    // Record hit time for flash (only when hit by active weapons)
     const float Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
-    if (OverlappedComp == HeadCollider) LastHeadHitTime = Now;
-    else if (OverlappedComp == TorsoCollider) LastTorsoHitTime = Now;
-    else if (OverlappedComp == LegCollider) LastLegHitTime = Now;
+    if (HittingWeapon && HittingWeapon->IsHitboxActive())
+    {
+        if (OverlappedComp == HeadCollider) LastHeadHitTime = Now;
+        else if (OverlappedComp == TorsoCollider) LastTorsoHitTime = Now;
+        else if (OverlappedComp == LegCollider) LastLegHitTime = Now;
+    }
 
     // Basic guard
     if (!OtherActor || OtherActor == this) return;
@@ -667,27 +670,27 @@ void AEnemyBase::OnBodyPartOverlap(UPrimitiveComponent* OverlappedComp, AActor* 
         HittingWeapon = OwnerWeapon;
     }
     
-    // If no weapon found, this might be a fist attack or other hitbox
-    // For now, we'll use a dummy pointer to track these hits too
+    // Ignore if no weapon or weapon hitbox is not active
     if (!HittingWeapon)
     {
-        // Create a unique identifier for non-weapon hits (e.g., fist attacks)
-        // We'll use the OtherActor as a key since it's unique per attack
-        if (HitByWeaponsThisSwing.Contains(TWeakObjectPtr<AWeaponBase>(nullptr)))
-        {
-            return; // Already hit by a non-weapon attack this swing
-        }
-        HitByWeaponsThisSwing.Add(TWeakObjectPtr<AWeaponBase>(nullptr));
+        UE_LOG(LogTemp, Verbose, TEXT("Enemy %s overlap ignored: no weapon found"), *GetName());
+        return;
     }
-    else
+    
+    if (!HittingWeapon->IsHitboxActive())
     {
-        // Check if this weapon has already hit us this swing
-        if (HitByWeaponsThisSwing.Contains(TWeakObjectPtr<AWeaponBase>(HittingWeapon)))
-        {
-            return; // Already hit by this weapon this swing
-        }
-        HitByWeaponsThisSwing.Add(TWeakObjectPtr<AWeaponBase>(HittingWeapon));
+        UE_LOG(LogTemp, Verbose, TEXT("Enemy %s overlap ignored: weapon %s hitbox not active"), *GetName(), *HittingWeapon->GetName());
+        return;
     }
+    
+    // Check if this weapon has already hit us this swing
+    if (HitByWeaponsThisSwing.Contains(TWeakObjectPtr<AWeaponBase>(HittingWeapon)))
+    {
+        UE_LOG(LogTemp, Verbose, TEXT("Enemy %s already hit by weapon %s this swing"), *GetName(), *HittingWeapon->GetName());
+        return; // Already hit by this weapon this swing
+    }
+    HitByWeaponsThisSwing.Add(TWeakObjectPtr<AWeaponBase>(HittingWeapon));
+    UE_LOG(LogTemp, Log, TEXT("Enemy %s hit by active weapon %s"), *GetName(), *HittingWeapon->GetName());
 
     // Determine body part
     EBodyPart BodyPart = EBodyPart::Torso;

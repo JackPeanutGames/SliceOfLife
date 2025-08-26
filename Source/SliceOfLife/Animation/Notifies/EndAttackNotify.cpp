@@ -17,5 +17,3 @@ void USOL_EndAttackNotify::Notify(USkeletalMeshComponent* MeshComp, UAnimSequenc
         }
     }
 }
-
-

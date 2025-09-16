@@ -53,6 +53,9 @@ protected:
     UPROPERTY(BlueprintReadOnly, Category = "Animation|Movement")
     bool bIsDoubleJump;
 
+    UPROPERTY(BlueprintReadOnly, Category = "Animation|Movement")
+    int32 JumpCount;
+
     // Facing right helper for 2.5D flipping in AnimBP if desired
     UPROPERTY(BlueprintReadOnly, Category = "Animation|Movement")
     bool bFacingRight;

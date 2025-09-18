@@ -63,7 +63,8 @@ void USliceOfLifeAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
         // Prefer our custom movement component's jump tracking if available
         if (CachedMovementComponent)
         {
-            const int32 JumpCount = CachedMovementComponent->GetJumpCount();
+            const int32 TempJumpCount = CachedMovementComponent->GetJumpCount();
+            JumpCount = TempJumpCount;
             bIsDoubleJump = (JumpCount >= 1);
         }
         else

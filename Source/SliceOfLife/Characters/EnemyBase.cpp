@@ -26,6 +26,8 @@
 #include "SliceOfLife/Items/ItemActor.h"
 #include "SliceOfLife/Items/ItemDropActor.h"
 #include "SliceOfLife/Weapons/WeaponBase.h"
+#include "Animation/AnimNotifies/AnimNotify.h"
+#include "Animation/AnimNotifies/AnimNotifyState.h"
 
 AEnemyBase::AEnemyBase()
 {
@@ -362,6 +364,8 @@ void AEnemyBase::PerformAttack()
     {
         if (UAnimInstance* AnimInst = GetMesh()->GetAnimInstance())
         {
+            // Throttle attack frequency
+            StateTimer = FMath::Max(StateTimer, MinAttackInterval);
             FOnMontageEnded MontageEnded;
             MontageEnded.BindLambda([this](UAnimMontage* Montage, bool bInterrupted)
             {
@@ -384,7 +388,7 @@ void AEnemyBase::PerformAttack()
 bool AEnemyBase::CanAttack() const
 {
 	// Basic attack cooldown check
-	return StateTimer <= 0.0f && CurrentState != EEnemyState::Stunned;
+	return StateTimer <= 0.0f && CurrentState != EEnemyState::Stunned && !bIsRecoveringFromHit && !bIsDying;
 }
 
 void AEnemyBase::UpdateAI(float DeltaTime)
@@ -430,8 +434,8 @@ void AEnemyBase::UpdateChase(float DeltaTime)
 		return;
 	}
 
-	// Check if target is in attack range
-	if (IsTargetInRange(CurrentTarget, EnemyStats.AttackRange))
+	// Check if target is in attack range and we are able to attack
+	if (IsTargetInRange(CurrentTarget, EnemyStats.AttackRange) && !bIsRecoveringFromHit && !bIsDying)
 	{
 		StartAttacking(CurrentTarget);
 		return;
@@ -535,8 +539,7 @@ void AEnemyBase::OnDamageReceived(float Damage, FVector KnockbackDirection, floa
 	// Check if enemy is dead from health
 	if (HealthComponent && !HealthComponent->IsAlive())
 	{
-		SetEnemyState(EEnemyState::Dead);
-		OnEnemyDeath();
+		Die();
 		return;
 	}
 	
@@ -588,15 +591,33 @@ void AEnemyBase::ResetSwingHits()
 void AEnemyBase::Die()
 {
 	UE_LOG(LogTemp, Log, TEXT("Enemy %s is dying"), *GetName());
-	
-	// Call blueprint event for death effects
-	OnEnemyDeath();
-	
+
+	if (bIsDying)
+	{
+		return;
+	}
+
+	bIsDying = true;
+	bIsRecoveringFromHit = true; // prevent further hits
+
 	// Stop all movement and AI
 	StopMovement();
 	SetEnemyState(EEnemyState::Dead);
-	
-	// Destroy the enemy after a short delay to allow death effects to play
+
+	// Call blueprint event for death effects
+	OnEnemyDeath();
+
+	// Play death montage if assigned; otherwise fallback to timed destroy
+	if (DeathMontage && GetMesh())
+	{
+		if (UAnimInstance* AnimInst = GetMesh()->GetAnimInstance())
+		{
+			AnimInst->Montage_Play(DeathMontage);
+			return; // destruction handled by USOL_DestroyNotify
+		}
+	}
+
+	// Fallback: timed destroy if no montage/anim instance
 	FTimerHandle DestroyTimerHandle;
 	GetWorld()->GetTimerManager().SetTimer(DestroyTimerHandle, [this]()
 	{
@@ -649,6 +670,10 @@ void AEnemyBase::OnBodyPartOverlap(UPrimitiveComponent* OverlappedComp, AActor* 
 {
     // Basic guard
     if (!OtherActor || OtherActor == this) return;
+    if (bIsRecoveringFromHit || bIsDying || RemainingDrops <= 0)
+    {
+        return; // invulnerable or already dead
+    }
 
     // Find the weapon that hit us (either directly or through its owner)
     AWeaponBase* HittingWeapon = nullptr;
@@ -794,6 +819,16 @@ void AEnemyBase::OnBodyPartOverlap(UPrimitiveComponent* OverlappedComp, AActor* 
             UE_LOG(LogTemp, Log, TEXT("Enemy %s has no more drops, dying"), *GetName());
             Die();
             return;
+        }
+
+        // Enter recovery and play hit montage
+        bIsRecoveringFromHit = true;
+        if (HitMontage && GetMesh())
+        {
+            if (UAnimInstance* AnimInst = GetMesh()->GetAnimInstance())
+            {
+                AnimInst->Montage_Play(HitMontage);
+            }
         }
     }
 }

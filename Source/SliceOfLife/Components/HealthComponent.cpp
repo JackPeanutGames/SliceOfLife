@@ -148,6 +148,7 @@ void UHealthComponent::ApplyKnockback(FVector Direction, float Force)
             // Disable and set velocity now for immediate, snappy response
             MovementComp->DisableMovement();
             MovementComp->Velocity = LaunchVel;
+        	OwnerCharacter->LaunchCharacter(LaunchVel, true, true);
         }
         else
         {

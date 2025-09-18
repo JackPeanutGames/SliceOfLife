@@ -107,6 +107,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Enemy Combat")
 	bool CanAttack() const;
 
+	// Recovery control for hit reactions (used by anim notifies)
+	UFUNCTION(BlueprintCallable, Category = "Enemy Combat")
+	void SetRecovering(bool bNewRecovering) { bIsRecoveringFromHit = bNewRecovering; }
+
 	UFUNCTION(BlueprintCallable, Category = "Combat")
 	void ReactToHit();
 
@@ -262,6 +266,17 @@ protected:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enemy Combat")
     class UAnimMontage* AttackMontage;
 
+    // Additional montages
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animations")
+    UAnimMontage* HitMontage;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animations")
+    UAnimMontage* DeathMontage;
+
+    // Attack pacing
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Enemy Combat")
+    float MinAttackInterval = 0.8f;
+
     // 2.5D constraint toggle — if true, constrains movement to Y=0 plane
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|PlaneConstraint")
     bool bConstrainToYPlane = true;
@@ -323,6 +338,13 @@ protected:
     
     // Track remaining drops for this enemy
     int32 RemainingDrops = 0;
+
+    // Hit/death flags
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Enemy Combat")
+    bool bIsRecoveringFromHit = false;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Enemy Combat")
+    bool bIsDying = false;
 
 protected:
     UFUNCTION()
